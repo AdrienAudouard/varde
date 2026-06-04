@@ -2,20 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
-  ROUTE,
-  POIS,
-  SEGMENTS,
-  TOTAL_KM,
   gradeAt,
   pointAtKm,
-  minEle,
-  maxEle,
+  type Poi,
   type PoiType,
+  type RoutePoint,
+  type Segment,
 } from "@/lib/varde/data";
 import { slopeColor } from "@/lib/varde/slope";
 import type { AutonomyMode } from "@/components/varde/topo-map";
 
 type ElevationProfileProps = {
+  route: readonly RoutePoint[];
+  pois: readonly Poi[];
+  segments: readonly Segment[];
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
   slopeOn: boolean;
@@ -38,6 +38,9 @@ const POI_COLOR: Record<PoiType, string> = {
 };
 
 export function ElevationProfile({
+  route,
+  pois,
+  segments,
   hoverKm,
   setHoverKm,
   slopeOn,
@@ -57,57 +60,75 @@ export function ElevationProfile({
     return () => ro.disconnect();
   }, []);
 
+  // Axis bounds derive from the loaded route; with no route they collapse to a
+  // harmless empty plot (no segments/POIs/line are drawn below).
+  const totalKm = route.length > 0 ? route[route.length - 1].dist : 0;
+  const { minEle, maxEle } = useMemo(() => {
+    if (route.length === 0) return { minEle: 0, maxEle: 0 };
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const p of route) {
+      if (p.ele < lo) lo = p.ele;
+      if (p.ele > hi) hi = p.ele;
+    }
+    return { minEle: lo, maxEle: hi };
+  }, [route]);
+
   const plotW = w - PAD_L - PAD_R;
   const plotH = H - PAD_T - PAD_B;
   const minE = Math.floor(minEle / 100) * 100 - 20;
   const maxE = Math.ceil(maxEle / 100) * 100 + 20;
-  const xOf = (km: number) => PAD_L + (km / TOTAL_KM) * plotW;
+  const xSpan = totalKm || 1;
+  const xOf = (km: number) => PAD_L + (km / xSpan) * plotW;
   const yOf = (e: number) => PAD_T + plotH - ((e - minE) / (maxE - minE)) * plotH;
 
   const areaD = useMemo(() => {
-    let d = `M${xOf(0)},${yOf(ROUTE[0].ele)}`;
-    for (const p of ROUTE) d += ` L${xOf(p.dist).toFixed(1)},${yOf(p.ele).toFixed(1)}`;
-    d += ` L${xOf(TOTAL_KM)},${PAD_T + plotH} L${xOf(0)},${PAD_T + plotH} Z`;
+    if (route.length === 0) return "";
+    let d = `M${xOf(0)},${yOf(route[0].ele)}`;
+    for (const p of route) d += ` L${xOf(p.dist).toFixed(1)},${yOf(p.ele).toFixed(1)}`;
+    d += ` L${xOf(totalKm)},${PAD_T + plotH} L${xOf(0)},${PAD_T + plotH} Z`;
     return d;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [w]);
+  }, [route, w]);
 
   const lineD = useMemo(() => {
-    return "M" + ROUTE.map((p) => `${xOf(p.dist).toFixed(1)},${yOf(p.ele).toFixed(1)}`).join(" L");
+    if (route.length === 0) return "";
+    return "M" + route.map((p) => `${xOf(p.dist).toFixed(1)},${yOf(p.ele).toFixed(1)}`).join(" L");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [w]);
+  }, [route, w]);
 
   const slopeBars = useMemo(() => {
-    if (!slopeOn) return null;
+    if (!slopeOn || route.length === 0) return null;
     const bars: Array<{ x: number; w: number; color: string }> = [];
     const stepN = 2;
-    for (let i = 0; i < ROUTE.length - stepN; i += stepN) {
-      const a = ROUTE[i];
-      const b = ROUTE[Math.min(ROUTE.length - 1, i + stepN)];
+    for (let i = 0; i < route.length - stepN; i += stepN) {
+      const a = route[i];
+      const b = route[Math.min(route.length - 1, i + stepN)];
       bars.push({
         x: xOf(a.dist),
         w: Math.max(1, xOf(b.dist) - xOf(a.dist)),
-        color: slopeColor(gradeAt(i + 1)),
+        color: slopeColor(gradeAt(route, i + 1)),
       });
     }
     return bars;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slopeOn, w]);
+  }, [slopeOn, route, w]);
 
-  const hoverPt = hoverKm != null ? pointAtKm(hoverKm) : null;
+  const hoverPt = hoverKm != null && route.length > 0 ? pointAtKm(route, hoverKm) : null;
 
   function onMove(e: MouseEvent<SVGSVGElement>) {
+    if (route.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * w;
-    const km = ((x - PAD_L) / plotW) * TOTAL_KM;
-    if (km >= 0 && km <= TOTAL_KM) setHoverKm(km);
+    const km = ((x - PAD_L) / plotW) * totalKm;
+    if (km >= 0 && km <= totalKm) setHoverKm(km);
     else setHoverKm(null);
   }
 
   const yTicks: number[] = [];
   for (let e = Math.ceil(minE / 200) * 200; e <= maxE; e += 200) yTicks.push(e);
   const xTicks: number[] = [];
-  for (let k = 0; k <= TOTAL_KM; k += 5) xTicks.push(k);
+  for (let k = 0; k <= totalKm; k += 5) xTicks.push(k);
 
   return (
     <div className="profile-wrap" ref={wrapRef}>
@@ -141,7 +162,7 @@ export function ElevationProfile({
         </g>
 
         {autonomyMode !== "badges" &&
-          SEGMENTS.map((s, i) => (
+          segments.map((s, i) => (
             <rect
               key={i}
               x={xOf(s.from.km)}
@@ -166,8 +187,8 @@ export function ElevationProfile({
 
         <path d={lineD} className="prof-line" fill="none" />
 
-        {POIS.map((p) => {
-          const e = pointAtKm(p.km).ele;
+        {pois.map((p) => {
+          const e = pointAtKm(route, p.km).ele;
           return (
             <g key={p.id}>
               <line x1={xOf(p.km)} y1={PAD_T} x2={xOf(p.km)} y2={PAD_T + plotH} className="poi-vline" />

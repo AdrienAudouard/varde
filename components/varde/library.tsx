@@ -1,40 +1,12 @@
 "use client";
 
 import { Icon } from "@/components/varde/icon";
-import { LIBRARY, fmtDur, rng, type LibraryItem } from "@/lib/varde/data";
 
 type LibraryProps = {
-  onOpen: (item: LibraryItem) => void;
   onImport: () => void;
 };
 
-function MiniProfile({ seed, active }: { seed: number; active?: boolean }) {
-  const r = rng(seed);
-  const N = 40;
-  const w = 220;
-  const h = 46;
-  const pts: Array<[number, number]> = [];
-  let e = 0.4 + r() * 0.2;
-  for (let i = 0; i < N; i++) {
-    e += (r() - 0.45) * 0.16;
-    e = Math.max(0.08, Math.min(0.95, e));
-    pts.push([(i / (N - 1)) * w, h - e * h]);
-  }
-  const line = "M" + pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" L");
-  const area = line + ` L${w},${h} L0,${h} Z`;
-  return (
-    <svg className="mini-prof" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-      <path d={area} className={"mp-area" + (active ? " active" : "")} />
-      <path d={line} className={"mp-line" + (active ? " active" : "")} fill="none" />
-    </svg>
-  );
-}
-
-function tagSlug(tag: string): string {
-  return tag.toLowerCase().replace(/[^a-z]/g, "");
-}
-
-export function Library({ onOpen, onImport }: LibraryProps) {
+export function Library({ onImport }: LibraryProps) {
   return (
     <div className="library">
       <div className="lib-head">
@@ -60,34 +32,16 @@ export function Library({ onOpen, onImport }: LibraryProps) {
           <div className="new-t">Dessiner une trace</div>
           <div className="new-s">ou importer un fichier GPX</div>
         </button>
+      </div>
 
-        {LIBRARY.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={"trace-card" + (t.active ? " featured" : "")}
-            onClick={() => onOpen(t)}
-          >
-            <div className="tc-mapthumb">
-              <MiniProfile seed={t.id.charCodeAt(1) * 7 + 3} active={t.active} />
-              <span className={"tc-tag " + tagSlug(t.tag)}>{t.tag}</span>
-            </div>
-            <div className="tc-body">
-              <div className="tc-name">{t.name}</div>
-              <div className="tc-stats mono">
-                <span>{t.dist.toFixed(1).replace(".", ",")} km</span>
-                <span className="up">+{t.dplus}</span>
-                <span>{fmtDur(t.hours)}</span>
-              </div>
-              <div className="tc-auto">
-                <span className="tc-drop">
-                  <Icon name="drop" size={13} /> {t.stops} pts d&apos;eau
-                </span>
-                <span className="tc-water">{t.water.toFixed(1).replace(".", ",")} L max</span>
-              </div>
-            </div>
-          </button>
-        ))}
+      <div className="empty-state lib-empty">
+        <div className="empty-state-ic">
+          <Icon name="route" size={28} />
+        </div>
+        <h2 className="empty-state-title">Aucune trace pour l&apos;instant</h2>
+        <p className="empty-state-text">
+          Importe un fichier GPX ou dessine une trace pour la retrouver ici.
+        </p>
       </div>
     </div>
   );

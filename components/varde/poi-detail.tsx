@@ -1,10 +1,11 @@
 "use client";
 
 import { Icon, type IconName } from "@/components/varde/icon";
-import { POIS, SEGMENTS, fmtTime, type PoiType } from "@/lib/varde/data";
+import { type Poi, type PoiType, type Segment, fmtTime } from "@/lib/varde/data";
 
 type PoiDetailProps = {
-  poiId: string;
+  poi: Poi;
+  seg: Segment | null;
   onClose: () => void;
 };
 
@@ -15,11 +16,8 @@ const TYPE_META: Record<PoiType, { label: string; icon: IconName; cls: string }>
   refuge: { label: "Refuge", icon: "house", cls: "refuge" },
 };
 
-export function PoiDetail({ poiId, onClose }: PoiDetailProps) {
-  const p = POIS.find((x) => x.id === poiId);
-  if (!p) return null;
+export function PoiDetail({ poi: p, seg, onClose }: PoiDetailProps) {
   const m = TYPE_META[p.type];
-  const seg = SEGMENTS.find((s) => s.to.km === p.km);
   return (
     <div className="poi-detail">
       <button type="button" className="pd-close" onClick={onClose}>

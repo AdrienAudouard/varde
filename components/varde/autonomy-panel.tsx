@@ -1,9 +1,10 @@
 "use client";
 
 import { Icon } from "@/components/varde/icon";
-import { SEGMENTS, fmtDur, fmtTime } from "@/lib/varde/data";
+import { fmtDur, fmtTime, type Segment } from "@/lib/varde/data";
 
 type AutonomyPanelProps = {
+  segments: readonly Segment[];
   selectedSeg: number | null;
   setSelectedSeg: (i: number | null) => void;
   hoverKm: number | null;
@@ -21,10 +22,10 @@ function WaterGauge({ liters }: { liters: number }) {
   );
 }
 
-export function AutonomyPanel({ selectedSeg, setSelectedSeg, hoverKm }: AutonomyPanelProps) {
-  const totalWater = SEGMENTS.reduce((a, s) => a + s.water, 0);
-  const longest = Math.max(...SEGMENTS.map((s) => s.dist));
-  const maxWater = Math.max(...SEGMENTS.map((s) => s.water));
+export function AutonomyPanel({ segments, selectedSeg, setSelectedSeg, hoverKm }: AutonomyPanelProps) {
+  const totalWater = segments.reduce((a, s) => a + s.water, 0);
+  const longest = segments.reduce((a, s) => Math.max(a, s.dist), 0);
+  const maxWater = segments.reduce((a, s) => Math.max(a, s.water), 0);
   return (
     <aside className="autonomy">
       <div className="au-head">
@@ -33,7 +34,7 @@ export function AutonomyPanel({ selectedSeg, setSelectedSeg, hoverKm }: Autonomy
       </div>
       <div className="au-summary">
         <div className="aus">
-          <span className="aus-v">{SEGMENTS.length}</span>
+          <span className="aus-v">{segments.length}</span>
           <span className="aus-l">segments</span>
         </div>
         <div className="aus">
@@ -52,7 +53,7 @@ export function AutonomyPanel({ selectedSeg, setSelectedSeg, hoverKm }: Autonomy
         </div>
       </div>
       <div className="au-list">
-        {SEGMENTS.map((s, i) => {
+        {segments.map((s, i) => {
           const active = selectedSeg === i;
           const here = hoverKm != null && hoverKm >= s.from.km && hoverKm <= s.to.km;
           return (

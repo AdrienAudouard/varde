@@ -5,9 +5,11 @@
 // to the CSS variables in globals.css.
 
 import { Icon } from "@/components/varde/icon";
-import { SEGMENTS, dplus, dminus, fmtDur, TOTAL_HOURS } from "@/lib/varde/data";
+import { fmtDur, type Segment, type Trace } from "@/lib/varde/data";
 
 type TopBarProps = {
+  trace: Trace | null;
+  segments: readonly Segment[];
   slopeOn: boolean;
   setSlopeOn: (v: boolean) => void;
   onImport: () => void;
@@ -18,6 +20,8 @@ type StatProps = {
   val: string;
   sub: string;
 };
+
+const PLACEHOLDER = "—";
 
 function Stat({ label, val, sub }: StatProps) {
   return (
@@ -31,40 +35,66 @@ function Stat({ label, val, sub }: StatProps) {
   );
 }
 
-export function TopBar({ slopeOn, setSlopeOn, onImport }: TopBarProps) {
-  const maxWater = SEGMENTS.reduce((a, s) => Math.max(a, s.water), 0);
+export function TopBar({ trace, segments, slopeOn, setSlopeOn, onImport }: TopBarProps) {
+  const hasTrace = trace != null && segments.length > 0;
+
+  const totalKm = trace != null && trace.route.length > 0 ? trace.route[trace.route.length - 1].dist : 0;
+  let dplus = 0;
+  let dminus = 0;
+  for (const s of segments) {
+    dplus += s.dplus;
+    dminus += s.dminus;
+  }
+  const totalHours = segments.reduce((a, s) => a + s.hours, 0);
+  const maxWater = hasTrace ? segments.reduce((a, s) => Math.max(a, s.water), 0) : 0;
+
   return (
     <header className="topbar">
       <div className="tb-title">
         <div className="tb-name">
-          Tour des Crêtes
-          <button type="button" className="tb-edit">
+          {hasTrace ? "Trace importée" : "Aucune trace"}
+          <button type="button" className="tb-edit" disabled={!hasTrace}>
             <Icon name="edit" size={15} />
           </button>
         </div>
         <div className="tb-meta">
-          Massif du Vallon · créée le 28 mai · <span className="tb-tag">En préparation</span>
+          {hasTrace ? (
+            <>
+              Plan d&apos;autonomie · <span className="tb-tag">En préparation</span>
+            </>
+          ) : (
+            "Importe un GPX pour commencer"
+          )}
         </div>
       </div>
       <div className="tb-stats">
-        <Stat label="Distance" val="34,2" sub=" km" />
-        <Stat label="D+" val={"+" + dplus} sub=" m" />
-        <Stat label="D−" val={"−" + dminus} sub=" m" />
-        <Stat label="Estimé" val={fmtDur(TOTAL_HOURS)} sub="" />
-        <Stat label="Eau / segment" val={maxWater.toFixed(1).replace(".", ",")} sub=" L" />
+        <Stat
+          label="Distance"
+          val={hasTrace ? totalKm.toFixed(1).replace(".", ",") : PLACEHOLDER}
+          sub={hasTrace ? " km" : ""}
+        />
+        <Stat label="D+" val={hasTrace ? "+" + Math.round(dplus) : PLACEHOLDER} sub={hasTrace ? " m" : ""} />
+        <Stat label="D−" val={hasTrace ? "−" + Math.round(dminus) : PLACEHOLDER} sub={hasTrace ? " m" : ""} />
+        <Stat label="Estimé" val={hasTrace ? fmtDur(totalHours) : PLACEHOLDER} sub="" />
+        <Stat
+          label="Eau / segment"
+          val={hasTrace ? maxWater.toFixed(1).replace(".", ",") : PLACEHOLDER}
+          sub={hasTrace ? " L" : ""}
+        />
       </div>
       <div className="tb-actions">
         <button
           type="button"
           className={"btn ghost" + (slopeOn ? " on" : "")}
           onClick={() => setSlopeOn(!slopeOn)}
+          disabled={!hasTrace}
         >
           <Icon name="grad" size={17} /> Calque pente
         </button>
         <button type="button" className="btn ghost" onClick={onImport}>
           <Icon name="import" size={17} /> Importer GPX
         </button>
-        <button type="button" className="btn primary">
+        <button type="button" className="btn primary" disabled={!hasTrace}>
           <Icon name="import" size={17} /> Exporter
         </button>
       </div>

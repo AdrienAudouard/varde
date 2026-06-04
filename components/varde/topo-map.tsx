@@ -16,16 +16,13 @@ import maplibregl, {
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
-  POIS,
-  ROUTE,
-  ROUTE_BOUNDS,
-  SEGMENTS,
   gradeAt,
   pointAtKm,
-  poiGeoPos,
-  svgToLngLat,
   type Poi,
   type PoiType,
+  type RoutePoint,
+  type Segment,
+  type Trace,
 } from "@/lib/varde/data";
 import { slopeColor } from "@/lib/varde/slope";
 import {
@@ -39,6 +36,8 @@ import {
 export type AutonomyMode = "panel" | "badges" | "table";
 
 type TopoMapProps = {
+  trace: Trace | null;
+  segments: readonly Segment[];
   slopeOn: boolean;
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
@@ -49,6 +48,14 @@ type TopoMapProps = {
   /** Notified when an Overpass water-point fetch starts (`true`) or settles
    *  (`false`). Used by the legend to show a spinner. */
   onWaterLoadingChange?: (loading: boolean) => void;
+};
+
+// Initial camera when no trace is loaded: centred on the French Alps
+// (Tarentaise), zoomed out enough to show regional terrain. Once a trace is
+// imported the future producer can fitBounds to its geometry instead.
+const DEFAULT_VIEW = {
+  center: [6.5, 45.6] as [number, number],
+  zoom: 7,
 };
 
 // The MapTiler Landscape style. Override with NEXT_PUBLIC_MAPTILER_STYLE_URL in
@@ -72,25 +79,30 @@ const POI_COLOR: Record<PoiType, string> = {
   refuge: "var(--poi-refuge)",
 };
 
-const ROUTE_COORDS: number[][] = ROUTE.map((p) => [p.lng, p.lat]);
+const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
 
-// Pre-compute slope segment features once at module load (deterministic).
-const SLOPE_FEATURES: Array<Feature<LineString, { color: string }>> = (() => {
+function routeCoords(route: readonly RoutePoint[]): number[][] {
+  return route.map((p) => [p.lng, p.lat]);
+}
+
+// Slope-coloured segment features for the route overlay. Derived from the
+// loaded route (empty until a trace is imported).
+function buildSlopeFeatures(
+  route: readonly RoutePoint[],
+): Array<Feature<LineString, { color: string }>> {
   const out: Array<Feature<LineString, { color: string }>> = [];
   const stepN = 3;
-  for (let i = 0; i < ROUTE.length - stepN; i += stepN) {
-    const a = ROUTE[i];
-    const b = ROUTE[Math.min(ROUTE.length - 1, i + stepN)];
+  for (let i = 0; i < route.length - stepN; i += stepN) {
+    const a = route[i];
+    const b = route[Math.min(route.length - 1, i + stepN)];
     out.push({
       type: "Feature",
       geometry: { type: "LineString", coordinates: [[a.lng, a.lat], [b.lng, b.lat]] },
-      properties: { color: slopeColor(gradeAt(i + 1)) },
+      properties: { color: slopeColor(gradeAt(route, i + 1)) },
     });
   }
   return out;
-})();
-
-const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
+}
 
 function poiGlyphSvg(type: PoiType): string {
   switch (type) {
@@ -201,6 +213,8 @@ function makeMarkerElement(poi: Poi, onActivate: () => void): HTMLButtonElement 
 // Badges mode is not wired through MapLibre yet — kept in the prop contract so
 // the rest of the planning view's API is unchanged; we just don't read it here.
 export function TopoMap({
+  trace,
+  segments,
   slopeOn,
   hoverKm,
   setHoverKm,
@@ -227,6 +241,13 @@ export function TopoMap({
   const setSelectedPoiRef = useRef(setSelectedPoi);
   const selectedPoiRef = useRef(selectedPoi);
   const onWaterLoadingChangeRef = useRef(onWaterLoadingChange);
+  // Latest trace, read by the persistent map handlers (mousemove → nearest
+  // route point) without re-mounting the map. Trace-dependent layers are only
+  // added on `load` when a trace exists — a dormant seam until GPX import lands.
+  const traceRef = useRef(trace);
+  useEffect(() => {
+    traceRef.current = trace;
+  }, [trace]);
   useEffect(() => {
     setHoverKmRef.current = setHoverKm;
   }, [setHoverKm]);
@@ -253,50 +274,106 @@ export function TopoMap({
     const map = new maplibregl.Map({
       container,
       style: STYLE_URL,
-      bounds: [
-        [ROUTE_BOUNDS[0], ROUTE_BOUNDS[1]],
-        [ROUTE_BOUNDS[2], ROUTE_BOUNDS[3]],
-      ],
-      fitBoundsOptions: { padding: 60, animate: false },
+      center: DEFAULT_VIEW.center,
+      zoom: DEFAULT_VIEW.zoom,
       attributionControl: { compact: true },
     });
     mapRef.current = map;
 
     map.on("load", () => {
-      map.addSource("route", {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          geometry: { type: "LineString", coordinates: ROUTE_COORDS },
-          properties: {},
-        },
-      });
-      map.addLayer({
-        id: "route-casing",
-        type: "line",
-        source: "route",
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": MARKER_STROKE, "line-width": 9, "line-opacity": 0.92 },
-      });
-      map.addLayer({
-        id: "route-main",
-        type: "line",
-        source: "route",
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": ACCENT, "line-width": 5 },
-      });
+      // Trace-dependent layers (route, slope, terminus, POI markers) are only
+      // built when a trace is loaded. With no trace the basemap + OSM water
+      // layer render on their own. This is the seam the GPX import flow fills.
+      const loaded = traceRef.current;
+      if (loaded && loaded.route.length > 0) {
+        const route = loaded.route;
+        map.addSource("route", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: routeCoords(route) },
+            properties: {},
+          },
+        });
+        map.addLayer({
+          id: "route-casing",
+          type: "line",
+          source: "route",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": MARKER_STROKE, "line-width": 9, "line-opacity": 0.92 },
+        });
+        map.addLayer({
+          id: "route-main",
+          type: "line",
+          source: "route",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": ACCENT, "line-width": 5 },
+        });
 
-      map.addSource("slope", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: SLOPE_FEATURES },
-      });
-      map.addLayer({
-        id: "slope-line",
-        type: "line",
-        source: "slope",
-        layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
-        paint: { "line-color": ["get", "color"], "line-width": 6.5 },
-      });
+        map.addSource("slope", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: buildSlopeFeatures(route) },
+        });
+        map.addLayer({
+          id: "slope-line",
+          type: "line",
+          source: "slope",
+          layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
+          paint: { "line-color": ["get", "color"], "line-width": 6.5 },
+        });
+
+        const first = route[0];
+        const last = route[route.length - 1];
+        map.addSource("terminus", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [first.lng, first.lat] },
+                properties: { kind: "start" },
+              },
+              {
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [last.lng, last.lat] },
+                properties: { kind: "finish" },
+              },
+            ],
+          },
+        });
+        map.addLayer({
+          id: "terminus-dot",
+          type: "circle",
+          source: "terminus",
+          paint: {
+            "circle-radius": 9,
+            "circle-color": [
+              "match",
+              ["get", "kind"],
+              "start",
+              TERMINUS_START,
+              "finish",
+              ACCENT,
+              "#000",
+            ],
+            "circle-stroke-color": MARKER_STROKE,
+            "circle-stroke-width": 3,
+          },
+        });
+
+        for (const poi of loaded.pois) {
+          const at = pointAtKm(route, poi.km);
+          const el = makeMarkerElement(poi, () => {
+            const next = selectedPoiRef.current === poi.id ? null : poi.id;
+            setSelectedPoiRef.current(next);
+          });
+          const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+            .setLngLat([at.lng, at.lat])
+            .addTo(map);
+          markers.set(poi.id, { marker, el });
+        }
+      }
 
       map.addSource("seg-hi", { type: "geojson", data: EMPTY_FC });
       map.addLayer({
@@ -330,58 +407,6 @@ export function TopoMap({
           "circle-stroke-width": 2,
         },
       });
-
-      const first = ROUTE[0];
-      const last = ROUTE[ROUTE.length - 1];
-      map.addSource("terminus", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [
-            {
-              type: "Feature",
-              geometry: { type: "Point", coordinates: [first.lng, first.lat] },
-              properties: { kind: "start" },
-            },
-            {
-              type: "Feature",
-              geometry: { type: "Point", coordinates: [last.lng, last.lat] },
-              properties: { kind: "finish" },
-            },
-          ],
-        },
-      });
-      map.addLayer({
-        id: "terminus-dot",
-        type: "circle",
-        source: "terminus",
-        paint: {
-          "circle-radius": 9,
-          "circle-color": [
-            "match",
-            ["get", "kind"],
-            "start",
-            TERMINUS_START,
-            "finish",
-            ACCENT,
-            "#000",
-          ],
-          "circle-stroke-color": MARKER_STROKE,
-          "circle-stroke-width": 3,
-        },
-      });
-
-      for (const poi of POIS) {
-        const geo = poiGeoPos(poi.km, poi.offset);
-        const el = makeMarkerElement(poi, () => {
-          const next = selectedPoiRef.current === poi.id ? null : poi.id;
-          setSelectedPoiRef.current(next);
-        });
-        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-          .setLngLat([geo.marker[0], geo.marker[1]])
-          .addTo(map);
-        markers.set(poi.id, { marker, el });
-      }
 
       // OSM water points layer (populated by the Overpass fetch below).
       map.addSource("osm-water", { type: "geojson", data: EMPTY_FC });
@@ -506,12 +531,14 @@ export function TopoMap({
     map.on("moveend", () => scheduleWaterFetch(400));
 
     const handleMove = (e: MapMouseEvent) => {
+      const route = traceRef.current?.route;
+      if (!route || route.length === 0) return;
       const { lng, lat } = e.lngLat;
       let best = 0;
       let bd = Infinity;
-      for (let i = 0; i < ROUTE.length; i += 2) {
-        const dx = ROUTE[i].lng - lng;
-        const dy = ROUTE[i].lat - lat;
+      for (let i = 0; i < route.length; i += 2) {
+        const dx = route[i].lng - lng;
+        const dy = route[i].lat - lat;
         const d = dx * dx + dy * dy;
         if (d < bd) {
           bd = d;
@@ -520,7 +547,7 @@ export function TopoMap({
       }
       // Threshold ≈ 600m squared in degree space at lat 45.6° — a generous
       // "near the trace" zone that still ignores pans across blank terrain.
-      if (bd < 4e-5) setHoverKmRef.current(ROUTE[best].dist);
+      if (bd < 4e-5) setHoverKmRef.current(route[best].dist);
       else setHoverKmRef.current(null);
     };
     map.on("mousemove", handleMove);
@@ -561,14 +588,15 @@ export function TopoMap({
         source.setData(EMPTY_FC);
         return;
       }
-      const seg = SEGMENTS[selectedSeg];
-      if (!seg) {
+      const seg = segments[selectedSeg];
+      const route = trace?.route;
+      if (!seg || !route) {
         source.setData(EMPTY_FC);
         return;
       }
-      const coords = ROUTE.filter((p) => p.dist >= seg.from.km && p.dist <= seg.to.km).map(
-        (p) => [p.lng, p.lat],
-      );
+      const coords = route
+        .filter((p) => p.dist >= seg.from.km && p.dist <= seg.to.km)
+        .map((p) => [p.lng, p.lat]);
       if (coords.length < 2) {
         source.setData(EMPTY_FC);
         return;
@@ -582,7 +610,7 @@ export function TopoMap({
     };
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [selectedSeg]);
+  }, [selectedSeg, segments, trace]);
 
   // Hover marker (bi-directional sync with the elevation profile).
   useEffect(() => {
@@ -591,22 +619,22 @@ export function TopoMap({
     const apply = () => {
       const source = map.getSource("hover-pt") as GeoJSONSource | undefined;
       if (!source) return;
-      if (hoverKm == null) {
+      const route = trace?.route;
+      if (hoverKm == null || !route || route.length === 0) {
         source.setData(EMPTY_FC);
         return;
       }
-      const p = pointAtKm(hoverKm);
-      const [lng, lat] = svgToLngLat(p.x, p.y);
+      const p = pointAtKm(route, hoverKm);
       const feature: Feature<Point> = {
         type: "Feature",
-        geometry: { type: "Point", coordinates: [lng, lat] },
+        geometry: { type: "Point", coordinates: [p.lng, p.lat] },
         properties: {},
       };
       source.setData(feature);
     };
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [hoverKm]);
+  }, [hoverKm, trace]);
 
   // POI selection state is reflected via class toggling on the marker DOM.
   useEffect(() => {

@@ -1,14 +1,15 @@
 "use client";
 
-import { SEGMENTS, fmtTime } from "@/lib/varde/data";
+import { fmtTime, type Segment } from "@/lib/varde/data";
 
 type RecapTableProps = {
+  segments: readonly Segment[];
   selectedSeg: number | null;
   setSelectedSeg: (i: number | null) => void;
 };
 
-export function RecapTable({ selectedSeg, setSelectedSeg }: RecapTableProps) {
-  const totalWater = SEGMENTS.reduce((a, s) => a + s.water, 0);
+export function RecapTable({ segments, selectedSeg, setSelectedSeg }: RecapTableProps) {
+  const totalWater = segments.reduce((a, s) => a + s.water, 0);
   return (
     <aside className="autonomy recap">
       <div className="au-head">
@@ -27,7 +28,7 @@ export function RecapTable({ selectedSeg, setSelectedSeg }: RecapTableProps) {
             </tr>
           </thead>
           <tbody>
-            {SEGMENTS.map((s, i) => (
+            {segments.map((s, i) => (
               <tr
                 key={i}
                 className={selectedSeg === i ? "active" : ""}

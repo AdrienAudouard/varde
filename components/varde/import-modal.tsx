@@ -97,15 +97,15 @@ function ImportModalContent({ onClose, onDone }: { onClose: () => void; onDone: 
         {stage === "parsing" && (
           <div className="modal-body parsing">
             <div className="parse-file">
-              <Icon name="route" size={18} /> tour-des-cretes.gpx
+              <Icon name="route" size={18} /> Lecture du fichier GPX…
             </div>
             <div className="pbar">
               <div className="pbar-fill" style={{ width: pct + "%" }} />
             </div>
             <div className="parse-steps mono">
-              <div className={pct > 5 ? "on" : ""}>· lecture du tracé · 2 184 points</div>
-              <div className={pct > 40 ? "on" : ""}>· profil altimétrique · D+ 1 980 m</div>
-              <div className={pct > 70 ? "on" : ""}>· recherche des POI à proximité…</div>
+              <div className={pct > 5 ? "on" : ""}>· lecture du tracé</div>
+              <div className={pct > 40 ? "on" : ""}>· calcul du profil altimétrique</div>
+              <div className={pct > 70 ? "on" : ""}>· recherche des points d&apos;eau à proximité</div>
             </div>
           </div>
         )}
@@ -116,24 +116,7 @@ function ImportModalContent({ onClose, onDone }: { onClose: () => void; onDone: 
               <Icon name="check" size={30} />
             </div>
             <div className="done-t">Trace importée</div>
-            <div className="done-grid mono">
-              <div>
-                <b>34,2 km</b>
-                <span>distance</span>
-              </div>
-              <div>
-                <b>+1 980 m</b>
-                <span>D+</span>
-              </div>
-              <div>
-                <b>7</b>
-                <span>POI détectés</span>
-              </div>
-              <div>
-                <b>6</b>
-                <span>segments</span>
-              </div>
-            </div>
+            <p className="done-sub">Ton plan d&apos;autonomie est prêt à être consulté.</p>
             <button type="button" className="btn primary full" onClick={onDone}>
               Ouvrir le plan d&apos;autonomie
             </button>

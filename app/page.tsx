@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/varde/icon";
 import { LeftRail, type View } from "@/components/varde/left-rail";
@@ -12,6 +12,7 @@ import { RecapTable } from "@/components/varde/recap-table";
 import { PoiDetail } from "@/components/varde/poi-detail";
 import { Library } from "@/components/varde/library";
 import { ImportModal } from "@/components/varde/import-modal";
+import { buildSegments, type Trace } from "@/lib/varde/data";
 
 // MapLibre touches `window` at module load — keep it out of the server bundle.
 const TopoMap = dynamic(
@@ -30,6 +31,20 @@ export default function Page() {
   const [importOpen, setImportOpen] = useState(false);
   const [waterLoading, setWaterLoading] = useState(false);
 
+  // Real settable state, not a hardcoded null: the GPX import flow becomes the
+  // producer by destructuring `setTrace` here and wiring it. No producer exists
+  // yet, so the view stays in its empty state.
+  const [trace] = useState<Trace | null>(null);
+
+  const route = trace?.route ?? [];
+  const pois = trace?.pois ?? [];
+  const segments = useMemo(() => buildSegments(trace), [trace]);
+  const hasTrace = trace != null;
+
+  const selectedPoiData = selectedPoi != null ? pois.find((p) => p.id === selectedPoi) ?? null : null;
+  const selectedPoiSeg =
+    selectedPoiData != null ? segments.find((s) => s.to.km === selectedPoiData.km) ?? null : null;
+
   return (
     <div className="app">
       <LeftRail view={view} setView={setView} />
@@ -38,6 +53,8 @@ export default function Page() {
         {view === "plan" && (
           <>
             <TopBar
+              trace={trace}
+              segments={segments}
               slopeOn={slopeOn}
               setSlopeOn={setSlopeOn}
               onImport={() => setImportOpen(true)}
@@ -46,6 +63,8 @@ export default function Page() {
               <section className="map-col">
                 <div className="map-stage">
                   <TopoMap
+                    trace={trace}
+                    segments={segments}
                     slopeOn={slopeOn}
                     hoverKm={hoverKm}
                     setHoverKm={setHoverKm}
@@ -110,7 +129,13 @@ export default function Page() {
                       </span>
                     </div>
                   )}
-                  {selectedPoi && <PoiDetail poiId={selectedPoi} onClose={() => setSelectedPoi(null)} />}
+                  {selectedPoiData && (
+                    <PoiDetail
+                      poi={selectedPoiData}
+                      seg={selectedPoiSeg}
+                      onClose={() => setSelectedPoi(null)}
+                    />
+                  )}
                 </div>
                 <div className="profile-panel">
                   <div className="pp-head">
@@ -122,6 +147,9 @@ export default function Page() {
                     </span>
                   </div>
                   <ElevationProfile
+                    route={route}
+                    pois={pois}
+                    segments={segments}
                     hoverKm={hoverKm}
                     setHoverKm={setHoverKm}
                     slopeOn={slopeOn}
@@ -132,22 +160,47 @@ export default function Page() {
                 </div>
               </section>
 
-              {AUTONOMY_MODE === "table" ? (
-                <RecapTable selectedSeg={selectedSeg} setSelectedSeg={setSelectedSeg} />
+              {hasTrace ? (
+                AUTONOMY_MODE === "table" ? (
+                  <RecapTable
+                    segments={segments}
+                    selectedSeg={selectedSeg}
+                    setSelectedSeg={setSelectedSeg}
+                  />
+                ) : (
+                  <AutonomyPanel
+                    segments={segments}
+                    selectedSeg={selectedSeg}
+                    setSelectedSeg={setSelectedSeg}
+                    hoverKm={hoverKm}
+                  />
+                )
               ) : (
-                <AutonomyPanel
-                  selectedSeg={selectedSeg}
-                  setSelectedSeg={setSelectedSeg}
-                  hoverKm={hoverKm}
-                />
+                <aside className="autonomy">
+                  <div className="empty-state">
+                    <div className="empty-state-ic">
+                      <Icon name="route" size={28} />
+                    </div>
+                    <h2 className="empty-state-title">Aucune trace chargée</h2>
+                    <p className="empty-state-text">
+                      Importe un fichier GPX pour visualiser le profil, les points d&apos;eau et le
+                      plan d&apos;autonomie.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={() => setImportOpen(true)}
+                    >
+                      <Icon name="import" size={17} /> Importer un GPX
+                    </button>
+                  </div>
+                </aside>
               )}
             </div>
           </>
         )}
 
-        {view === "library" && (
-          <Library onOpen={() => setView("plan")} onImport={() => setImportOpen(true)} />
-        )}
+        {view === "library" && <Library onImport={() => setImportOpen(true)} />}
       </main>
 
       <ImportModal
