@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import maplibregl, {
+  type ExpressionSpecification,
   type GeoJSONSource,
   type Map as MaplibreMap,
   type MapMouseEvent,
@@ -105,14 +106,22 @@ function poiGlyphSvg(type: PoiType): string {
 }
 
 // OSM water-point dot colors — tuned to read as a quieter, secondary layer
-// alongside the user's curated POIs (which use POI_COLOR above).
-const OSM_WATER_COLOR: Record<WaterPointKind, string> = {
-  drinking_water: "#2b6f9e",
-  water_point: "#2b6f9e",
-  tap: "#2b6f9e",
-  spring: "#56b4e0",
-  other: "#2b6f9e",
-};
+// alongside the user's curated POIs (which use POI_COLOR above). Springs get
+// a lighter cyan to signal "less reliable"; every other tag uses the same blue.
+const WATER_DOT_COLOR = "#2b6f9e";
+const SPRING_DOT_COLOR = "#56b4e0";
+
+// Shared MapLibre `circle-color` expression for both the halo and the dot
+// layers, so the two stay in lockstep on future kind tweaks. Built as a
+// factory rather than a frozen constant because MapLibre's paint specs
+// occasionally mutate the arrays they're given.
+const osmWaterColorExpr = (): ExpressionSpecification => [
+  "match",
+  ["get", "kind"],
+  "spring",
+  SPRING_DOT_COLOR,
+  WATER_DOT_COLOR,
+];
 
 // Build popup DOM with textContent/href (no innerHTML) so untrusted OSM tag
 // values can't smuggle script/HTML into the page.
@@ -383,13 +392,7 @@ export function TopoMap({
         minzoom: 9,
         paint: {
           "circle-radius": 9,
-          "circle-color": [
-            "match",
-            ["get", "kind"],
-            "spring",
-            OSM_WATER_COLOR.spring,
-            OSM_WATER_COLOR.drinking_water,
-          ],
+          "circle-color": osmWaterColorExpr(),
           "circle-opacity": 0.22,
         },
       });
@@ -400,13 +403,7 @@ export function TopoMap({
         minzoom: 9,
         paint: {
           "circle-radius": 4.5,
-          "circle-color": [
-            "match",
-            ["get", "kind"],
-            "spring",
-            OSM_WATER_COLOR.spring,
-            OSM_WATER_COLOR.drinking_water,
-          ],
+          "circle-color": osmWaterColorExpr(),
           "circle-stroke-color": "#fff",
           "circle-stroke-width": 1.5,
         },
@@ -439,7 +436,8 @@ export function TopoMap({
 
     // --- Overpass: fetch OSM water points for the current viewport ----------
     // Debounced refetch on every moveend; in-flight requests are aborted when
-    // a new one starts; identical bounding boxes are skipped via a key string.
+    // a new one starts; identical or contained bounding boxes are skipped via
+    // `bboxContains`.
     let waterFetchTimer: number | null = null;
     let waterFetchAbort: AbortController | null = null;
     let lastFetchedBbox: Bbox | null = null;
@@ -454,23 +452,15 @@ export function TopoMap({
 
     async function runWaterFetch() {
       if (!readyRef.current) return;
-      const zoom = map.getZoom();
-      if (zoom < 9) {
-        console.debug("[varde/overpass] skip: zoom", zoom.toFixed(2), "< 9");
-        return;
-      }
+      if (map.getZoom() < 9) return;
       const b = map.getBounds();
       const bbox: Bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-      if (lastFetchedBbox && bboxContains(lastFetchedBbox, bbox)) {
-        console.debug("[varde/overpass] skip: view contained in last fetched bbox");
-        return;
-      }
+      if (lastFetchedBbox && bboxContains(lastFetchedBbox, bbox)) return;
       lastFetchedBbox = bbox;
 
       waterFetchAbort?.abort();
       const ctrl = new AbortController();
       waterFetchAbort = ctrl;
-      console.debug("[varde/overpass] fetch", { zoom: zoom.toFixed(2), bbox });
       onWaterLoadingChangeRef.current?.(true);
       try {
         const points = await fetchWaterPoints(bbox, ctrl.signal);
@@ -488,7 +478,6 @@ export function TopoMap({
           }),
         );
         source.setData({ type: "FeatureCollection", features });
-        console.debug("[varde/overpass] loaded", points.length, "water points");
         setWaterError(null);
         onWaterLoadingChangeRef.current?.(false);
       } catch (err) {
@@ -514,10 +503,7 @@ export function TopoMap({
       waterFetchTimer = window.setTimeout(runWaterFetch, delayMs);
     }
 
-    map.on("moveend", () => {
-      console.debug("[varde/overpass] moveend → scheduling fetch");
-      scheduleWaterFetch(400);
-    });
+    map.on("moveend", () => scheduleWaterFetch(400));
 
     const handleMove = (e: MapMouseEvent) => {
       const { lng, lat } = e.lngLat;

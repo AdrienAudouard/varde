@@ -51,7 +51,9 @@ type OverpassNode = {
 };
 
 type OverpassResponse = {
-  elements: ReadonlyArray<OverpassNode | { type: string }>;
+  // Optional + unknown because we can't trust the parsed body shape until the
+  // `Array.isArray` guard in `fetchWaterPoints` has run.
+  elements?: ReadonlyArray<OverpassNode | { type: string }>;
 };
 
 function buildQuery(bbox: Bbox): string {
@@ -96,6 +98,11 @@ export async function fetchWaterPoints(
   });
   if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
   const json = (await res.json()) as OverpassResponse;
+  // Defensive against a 200 with an unexpected shape (e.g. a rate-limit HTML
+  // page that happens to parse as JSON, or a future Overpass schema change).
+  if (!Array.isArray(json.elements)) {
+    throw new Error("Overpass: unexpected response shape");
+  }
   const out: WaterPoint[] = [];
   for (const el of json.elements) {
     if (el.type !== "node") continue;
