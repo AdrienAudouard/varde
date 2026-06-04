@@ -380,6 +380,76 @@ button {
   font-size: 10px;
 }
 
+/* Overpass fetch error banner — appears at the top of the map stage */
+.varde-water-error {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: color-mix(in srgb, #c44028 92%, transparent);
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  max-width: 60%;
+  text-align: center;
+}
+
+/* Popup shown when clicking an OSM water point (Overpass API result) */
+.maplibregl-popup-content:has(.osm-water-popup) {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-family: inherit;
+}
+.osm-water-popup-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.osm-water-popup-sub {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  font-weight: 700;
+  margin-top: 2px;
+}
+.osm-water-popup-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.osm-water-popup-list dt {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.osm-water-popup-list dd {
+  color: var(--ink);
+  font-weight: 600;
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+.osm-water-popup-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.osm-water-popup-link:hover {
+  text-decoration: underline;
+}
+
 .forest ellipse {
   fill: var(--forest);
 }
@@ -539,6 +609,27 @@ button {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+/* Inline spinner shown next to "Eau" in the map legend while the Overpass
+   fetch is in flight. Reuses --accent + --line so it matches both themes. */
+.varde-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: varde-spin 0.8s linear infinite;
+}
+@keyframes varde-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .varde-spinner {
+    animation-duration: 2s;
+  }
 }
 .lg.eau {
   background: var(--poi-eau);

@@ -28,6 +28,7 @@ export default function Page() {
   const [selectedSeg, setSelectedSeg] = useState<number | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [waterLoading, setWaterLoading] = useState(false);
 
   return (
     <div className="app">
@@ -52,6 +53,7 @@ export default function Page() {
                     autonomyMode={AUTONOMY_MODE}
                     selectedPoi={selectedPoi}
                     setSelectedPoi={setSelectedPoi}
+                    onWaterLoadingChange={setWaterLoading}
                   />
                   <div className="map-ctrls">
                     <button type="button" className="mc-btn">
@@ -89,6 +91,13 @@ export default function Page() {
                     <div className="map-legend">
                       <span>
                         <i className="lg eau" /> Eau
+                        {waterLoading && (
+                          <span
+                            className="varde-spinner"
+                            role="status"
+                            aria-label="Chargement des points d'eau"
+                          />
+                        )}
                       </span>
                       <span>
                         <i className="lg ravito" /> Ravito

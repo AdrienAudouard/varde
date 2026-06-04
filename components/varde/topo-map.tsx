@@ -6,7 +6,7 @@
 // All interaction contracts (hoverKm sync, selectedPoi, selectedSeg, slopeOn)
 // match the previous component so the rest of the planning view is untouched.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, {
   type GeoJSONSource,
   type Map as MaplibreMap,
@@ -27,6 +27,13 @@ import {
   type PoiType,
 } from "@/lib/varde/data";
 import { slopeColor } from "@/lib/varde/slope";
+import {
+  KIND_LABEL,
+  fetchWaterPoints,
+  type Bbox,
+  type WaterPoint,
+  type WaterPointKind,
+} from "@/lib/varde/overpass";
 
 export type AutonomyMode = "panel" | "badges" | "table";
 
@@ -38,6 +45,9 @@ type TopoMapProps = {
   autonomyMode: AutonomyMode;
   selectedPoi: string | null;
   setSelectedPoi: (id: string | null) => void;
+  /** Notified when an Overpass water-point fetch starts (`true`) or settles
+   *  (`false`). Used by the legend to show a spinner. */
+  onWaterLoadingChange?: (loading: boolean) => void;
 };
 
 // The MapTiler Landscape style. Override with NEXT_PUBLIC_MAPTILER_STYLE_URL in
@@ -94,6 +104,65 @@ function poiGlyphSvg(type: PoiType): string {
   }
 }
 
+// OSM water-point dot colors — tuned to read as a quieter, secondary layer
+// alongside the user's curated POIs (which use POI_COLOR above).
+const OSM_WATER_COLOR: Record<WaterPointKind, string> = {
+  drinking_water: "#2b6f9e",
+  water_point: "#2b6f9e",
+  tap: "#2b6f9e",
+  spring: "#56b4e0",
+  other: "#2b6f9e",
+};
+
+// Build popup DOM with textContent/href (no innerHTML) so untrusted OSM tag
+// values can't smuggle script/HTML into the page.
+function buildOsmPopupContent(wp: WaterPoint): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "osm-water-popup";
+
+  const title = document.createElement("div");
+  title.className = "osm-water-popup-title";
+  title.textContent = wp.name ?? KIND_LABEL[wp.kind];
+  root.appendChild(title);
+
+  const sub = document.createElement("div");
+  sub.className = "osm-water-popup-sub";
+  sub.textContent = wp.name ? KIND_LABEL[wp.kind] : "OpenStreetMap";
+  root.appendChild(sub);
+
+  const rows: Array<readonly [string, string]> = [];
+  if (wp.drinkable === true) rows.push(["Potable", "oui"]);
+  if (wp.drinkable === false) rows.push(["Potable", "non"]);
+  if (wp.seasonal) rows.push(["Saisonnier", "oui"]);
+  if (wp.fee === true) rows.push(["Payant", "oui"]);
+  if (wp.operator) rows.push(["Opérateur", wp.operator]);
+  if (wp.openingHours) rows.push(["Horaires", wp.openingHours]);
+
+  if (rows.length > 0) {
+    const list = document.createElement("dl");
+    list.className = "osm-water-popup-list";
+    for (const [k, v] of rows) {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.textContent = v;
+      list.appendChild(dt);
+      list.appendChild(dd);
+    }
+    root.appendChild(list);
+  }
+
+  const link = document.createElement("a");
+  link.className = "osm-water-popup-link";
+  link.href = `https://www.openstreetmap.org/node/${wp.id}`;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Voir sur OpenStreetMap →";
+  root.appendChild(link);
+
+  return root;
+}
+
 function makeMarkerElement(poi: Poi, onActivate: () => void): HTMLButtonElement {
   const el = document.createElement("button");
   el.type = "button";
@@ -129,17 +198,26 @@ export function TopoMap({
   selectedSeg,
   selectedPoi,
   setSelectedPoi,
+  onWaterLoadingChange,
 }: TopoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Surfaces Overpass failures in the UI — the public endpoint can rate-limit
+  // or 5xx on rapid pans, and a silent catch hid that completely.
+  const [waterError, setWaterError] = useState<string | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const readyRef = useRef(false);
   const markersRef = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
+  // OSM water points fetched from Overpass — keyed by OSM node id so the click
+  // popup can look up full details from the feature's `id` property without
+  // round-tripping the (potentially large) tag dict through GeoJSON properties.
+  const waterPointsRef = useRef<Map<number, WaterPoint>>(new Map());
 
   // Latest-callback refs so the map's load/mousemove handlers (registered once)
   // always see the current props without re-creating the map on every render.
   const setHoverKmRef = useRef(setHoverKm);
   const setSelectedPoiRef = useRef(setSelectedPoi);
   const selectedPoiRef = useRef(selectedPoi);
+  const onWaterLoadingChangeRef = useRef(onWaterLoadingChange);
   useEffect(() => {
     setHoverKmRef.current = setHoverKm;
   }, [setHoverKm]);
@@ -149,6 +227,9 @@ export function TopoMap({
   useEffect(() => {
     selectedPoiRef.current = selectedPoi;
   }, [selectedPoi]);
+  useEffect(() => {
+    onWaterLoadingChangeRef.current = onWaterLoadingChange;
+  }, [onWaterLoadingChange]);
 
   // Mount / unmount the map once. All later updates go through setData /
   // setLayoutProperty against the live map instance.
@@ -293,7 +374,149 @@ export function TopoMap({
         markers.set(poi.id, { marker, el });
       }
 
+      // OSM water points layer (populated by the Overpass fetch below).
+      map.addSource("osm-water", { type: "geojson", data: EMPTY_FC });
+      map.addLayer({
+        id: "osm-water-halo",
+        type: "circle",
+        source: "osm-water",
+        minzoom: 9,
+        paint: {
+          "circle-radius": 9,
+          "circle-color": [
+            "match",
+            ["get", "kind"],
+            "spring",
+            OSM_WATER_COLOR.spring,
+            OSM_WATER_COLOR.drinking_water,
+          ],
+          "circle-opacity": 0.22,
+        },
+      });
+      map.addLayer({
+        id: "osm-water-dot",
+        type: "circle",
+        source: "osm-water",
+        minzoom: 9,
+        paint: {
+          "circle-radius": 4.5,
+          "circle-color": [
+            "match",
+            ["get", "kind"],
+            "spring",
+            OSM_WATER_COLOR.spring,
+            OSM_WATER_COLOR.drinking_water,
+          ],
+          "circle-stroke-color": "#fff",
+          "circle-stroke-width": 1.5,
+        },
+      });
+
+      map.on("click", "osm-water-dot", (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const props = f.properties as { id?: number } | null;
+        const id = props?.id;
+        if (typeof id !== "number") return;
+        const wp = waterPointsRef.current.get(id);
+        if (!wp) return;
+        new maplibregl.Popup({ offset: 12, closeButton: true, maxWidth: "260px" })
+          .setLngLat([wp.lng, wp.lat])
+          .setDOMContent(buildOsmPopupContent(wp))
+          .addTo(map);
+      });
+      map.on("mouseenter", "osm-water-dot", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", "osm-water-dot", () => {
+        map.getCanvas().style.cursor = "";
+      });
+
       readyRef.current = true;
+      // Kick off the first Overpass fetch now that the source exists.
+      scheduleWaterFetch(0);
+    });
+
+    // --- Overpass: fetch OSM water points for the current viewport ----------
+    // Debounced refetch on every moveend; in-flight requests are aborted when
+    // a new one starts; identical bounding boxes are skipped via a key string.
+    let waterFetchTimer: number | null = null;
+    let waterFetchAbort: AbortController | null = null;
+    let lastFetchedBbox: Bbox | null = null;
+
+    // True when `inner` is fully contained in `outer` — used to skip refetch
+    // when the user pans inside an area we already have data for.
+    function bboxContains(outer: Bbox, inner: Bbox): boolean {
+      const [w1, s1, e1, n1] = outer;
+      const [w2, s2, e2, n2] = inner;
+      return w2 >= w1 && s2 >= s1 && e2 <= e1 && n2 <= n1;
+    }
+
+    async function runWaterFetch() {
+      if (!readyRef.current) return;
+      const zoom = map.getZoom();
+      if (zoom < 9) {
+        console.debug("[varde/overpass] skip: zoom", zoom.toFixed(2), "< 9");
+        return;
+      }
+      const b = map.getBounds();
+      const bbox: Bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+      if (lastFetchedBbox && bboxContains(lastFetchedBbox, bbox)) {
+        console.debug("[varde/overpass] skip: view contained in last fetched bbox");
+        return;
+      }
+      lastFetchedBbox = bbox;
+
+      waterFetchAbort?.abort();
+      const ctrl = new AbortController();
+      waterFetchAbort = ctrl;
+      console.debug("[varde/overpass] fetch", { zoom: zoom.toFixed(2), bbox });
+      onWaterLoadingChangeRef.current?.(true);
+      try {
+        const points = await fetchWaterPoints(bbox, ctrl.signal);
+        // If aborted by a newer fetch, *don't* flip loading to false — the
+        // replacement fetch already set it to true and owns the lifecycle.
+        if (ctrl.signal.aborted) return;
+        waterPointsRef.current = new Map(points.map((p) => [p.id, p]));
+        const source = map.getSource("osm-water") as GeoJSONSource | undefined;
+        if (!source) return;
+        const features: Array<Feature<Point, { id: number; kind: WaterPointKind }>> = points.map(
+          (p) => ({
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+            properties: { id: p.id, kind: p.kind },
+          }),
+        );
+        source.setData({ type: "FeatureCollection", features });
+        console.debug("[varde/overpass] loaded", points.length, "water points");
+        setWaterError(null);
+        onWaterLoadingChangeRef.current?.(false);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        // Clear the cached bbox so the next pan retries (otherwise a transient
+        // failure would lock us out until the user pans entirely outside this bbox).
+        lastFetchedBbox = null;
+        // Drop any previously-rendered points: stale markers from the prior
+        // viewport are misleading once we know the current view's data is
+        // unknown. The error banner explains the empty state.
+        waterPointsRef.current.clear();
+        const source = map.getSource("osm-water") as GeoJSONSource | undefined;
+        source?.setData(EMPTY_FC);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[varde/overpass] fetch failed", err);
+        setWaterError(msg);
+        onWaterLoadingChangeRef.current?.(false);
+      }
+    }
+
+    function scheduleWaterFetch(delayMs: number) {
+      if (waterFetchTimer != null) window.clearTimeout(waterFetchTimer);
+      waterFetchTimer = window.setTimeout(runWaterFetch, delayMs);
+    }
+
+    map.on("moveend", () => {
+      console.debug("[varde/overpass] moveend → scheduling fetch");
+      scheduleWaterFetch(400);
     });
 
     const handleMove = (e: MapMouseEvent) => {
@@ -318,6 +541,8 @@ export function TopoMap({
     map.on("mouseout", () => setHoverKmRef.current(null));
 
     return () => {
+      if (waterFetchTimer != null) window.clearTimeout(waterFetchTimer);
+      waterFetchAbort?.abort();
       markers.forEach(({ marker }) => marker.remove());
       markers.clear();
       map.remove();
@@ -404,5 +629,14 @@ export function TopoMap({
     }
   }, [selectedPoi]);
 
-  return <div ref={containerRef} className="topomap" />;
+  return (
+    <>
+      <div ref={containerRef} className="topomap" />
+      {waterError && (
+        <div className="varde-water-error" role="status">
+          Overpass API : {waterError}
+        </div>
+      )}
+    </>
+  );
 }
