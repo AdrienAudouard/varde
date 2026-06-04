@@ -20,6 +20,11 @@ There is no test runner configured.
 ## Architecture
 
 - **App Router only** — all routes live under `app/`. `app/layout.tsx` is the root layout (sets up Geist fonts via `next/font/google` and the html/body shell); `app/page.tsx` is the home route.
-- **Styling**: Tailwind CSS v4 via `@tailwindcss/postcss` (configured in `postcss.config.mjs`). Global styles in `app/globals.css`. No `tailwind.config.*` — v4 uses CSS-based configuration.
-- **TypeScript**: strict mode on. Path alias `@/*` maps to the project root (configured in `tsconfig.json`).
+- **Styling**: Tailwind CSS v4 via `@tailwindcss/postcss` (configured in `postcss.config.mjs`). Global styles and theme tokens (light/dark CSS variables, `@theme inline`) live in `app/globals.css`. No `tailwind.config.*` — v4 uses CSS-based configuration.
+- **UI components**: [shadcn/ui](https://ui.shadcn.com) (`base-nova` style, `neutral` base color, CSS variables, Lucide icons, RSC-enabled). Config in `components.json`. Components live in `components/ui/`; the `cn()` helper is in `lib/utils.ts`. Add new components with `npx shadcn@latest add <name>` — do not hand-roll primitives that shadcn already provides. Built on `@base-ui/react` + `class-variance-authority`; merge classes with `cn()`.
+- **TypeScript**: strict mode on. Path alias `@/*` maps to the project root (configured in `tsconfig.json`). Shadcn aliases: `@/components`, `@/components/ui`, `@/lib`, `@/lib/utils`, `@/hooks`.
 - **ESLint**: flat config in `eslint.config.mjs` extending `eslint-config-next/core-web-vitals` and `eslint-config-next/typescript`.
+
+## Node version
+
+Requires **Node 18+** (shadcn CLI and Next.js 16). If `node --version` shows v14/v16, run `nvm use 22` before `npm install`, `npm run dev`, or `npx shadcn@latest add ...`.
