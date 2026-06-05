@@ -718,10 +718,10 @@ button {
   border-radius: 4px;
 }
 .sl-bar.up {
-  background: linear-gradient(90deg, #7ea874, #d6c65c, #d48c38, #c44028);
+  background: linear-gradient(90deg, #ebcd41, #e1822d, #c62d26);
 }
 .sl-bar.down {
-  background: linear-gradient(90deg, #78bcc4, #468cc8, #565cc4, #783ca8);
+  background: linear-gradient(90deg, #3c78cd, #3caf6e, #23783c);
 }
 .sl-mx {
   font-size: 10px;
@@ -1346,54 +1346,71 @@ button {
 .dz-s {
   font-size: 12.5px;
 }
-.imp-opt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--ink-2);
-  margin-top: 12px;
-  cursor: pointer;
-}
-.imp-opt input {
-  accent-color: var(--accent);
-  width: 15px;
-  height: 15px;
+.imp-file-input {
+  display: none;
 }
 .parsing .parse-file {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 10px;
   font-family: var(--font-mono), monospace;
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 14px;
-}
-.pbar {
-  height: 8px;
-  background: var(--card-2);
-  border-radius: 5px;
-  overflow: hidden;
-}
-.pbar-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 5px;
-  transition: width 0.12s;
-}
-.parse-steps {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-.parse-steps .on {
-  color: var(--ink);
+  padding: 28px 0;
 }
 .done {
   text-align: center;
+}
+.done-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.done-stats .ds-cell {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.done-stats .ds-wide {
+  grid-column: 1 / -1;
+}
+.done-stats dt {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  margin-bottom: 3px;
+}
+.done-stats dd {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.imp-error {
+  text-align: center;
+}
+.imp-error-ic {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  margin: 4px auto 14px;
+}
+.imp-error-t {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.imp-error-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin-bottom: 20px;
 }
 .done-ic {
   width: 58px;
@@ -1408,13 +1425,7 @@ button {
 .done-t {
   font-size: 18px;
   font-weight: 800;
-  margin-bottom: 8px;
-}
-.done-sub {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 /* scrollbars */

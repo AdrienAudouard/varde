@@ -281,99 +281,55 @@ export function TopoMap({
     mapRef.current = map;
 
     map.on("load", () => {
-      // Trace-dependent layers (route, slope, terminus, POI markers) are only
-      // built when a trace is loaded. With no trace the basemap + OSM water
-      // layer render on their own. This is the seam the GPX import flow fills.
-      const loaded = traceRef.current;
-      if (loaded && loaded.route.length > 0) {
-        const route = loaded.route;
-        map.addSource("route", {
-          type: "geojson",
-          data: {
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: routeCoords(route) },
-            properties: {},
-          },
-        });
-        map.addLayer({
-          id: "route-casing",
-          type: "line",
-          source: "route",
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": MARKER_STROKE, "line-width": 9, "line-opacity": 0.92 },
-        });
-        map.addLayer({
-          id: "route-main",
-          type: "line",
-          source: "route",
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": ACCENT, "line-width": 5 },
-        });
+      // Trace-dependent sources are created unconditionally, seeded empty, in
+      // insertion order route → slope → terminus → seg-hi → hover → osm-water
+      // so the highlight/hover layers stay on top. The `[trace]` effect below
+      // fills route/slope/terminus and rebuilds POI markers when a trace loads.
+      map.addSource("route", { type: "geojson", data: EMPTY_FC });
+      map.addLayer({
+        id: "route-casing",
+        type: "line",
+        source: "route",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": MARKER_STROKE, "line-width": 9, "line-opacity": 0.92 },
+      });
+      map.addLayer({
+        id: "route-main",
+        type: "line",
+        source: "route",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": ACCENT, "line-width": 5 },
+      });
 
-        map.addSource("slope", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: buildSlopeFeatures(route) },
-        });
-        map.addLayer({
-          id: "slope-line",
-          type: "line",
-          source: "slope",
-          layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
-          paint: { "line-color": ["get", "color"], "line-width": 6.5 },
-        });
+      map.addSource("slope", { type: "geojson", data: EMPTY_FC });
+      map.addLayer({
+        id: "slope-line",
+        type: "line",
+        source: "slope",
+        layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
+        paint: { "line-color": ["get", "color"], "line-width": 6.5 },
+      });
 
-        const first = route[0];
-        const last = route[route.length - 1];
-        map.addSource("terminus", {
-          type: "geojson",
-          data: {
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                geometry: { type: "Point", coordinates: [first.lng, first.lat] },
-                properties: { kind: "start" },
-              },
-              {
-                type: "Feature",
-                geometry: { type: "Point", coordinates: [last.lng, last.lat] },
-                properties: { kind: "finish" },
-              },
-            ],
-          },
-        });
-        map.addLayer({
-          id: "terminus-dot",
-          type: "circle",
-          source: "terminus",
-          paint: {
-            "circle-radius": 9,
-            "circle-color": [
-              "match",
-              ["get", "kind"],
-              "start",
-              TERMINUS_START,
-              "finish",
-              ACCENT,
-              "#000",
-            ],
-            "circle-stroke-color": MARKER_STROKE,
-            "circle-stroke-width": 3,
-          },
-        });
-
-        for (const poi of loaded.pois) {
-          const at = pointAtKm(route, poi.km);
-          const el = makeMarkerElement(poi, () => {
-            const next = selectedPoiRef.current === poi.id ? null : poi.id;
-            setSelectedPoiRef.current(next);
-          });
-          const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-            .setLngLat([at.lng, at.lat])
-            .addTo(map);
-          markers.set(poi.id, { marker, el });
-        }
-      }
+      map.addSource("terminus", { type: "geojson", data: EMPTY_FC });
+      map.addLayer({
+        id: "terminus-dot",
+        type: "circle",
+        source: "terminus",
+        paint: {
+          "circle-radius": 9,
+          "circle-color": [
+            "match",
+            ["get", "kind"],
+            "start",
+            TERMINUS_START,
+            "finish",
+            ACCENT,
+            "#000",
+          ],
+          "circle-stroke-color": MARKER_STROKE,
+          "circle-stroke-width": 3,
+        },
+      });
 
       map.addSource("seg-hi", { type: "geojson", data: EMPTY_FC });
       map.addLayer({
@@ -563,6 +519,103 @@ export function TopoMap({
       readyRef.current = false;
     };
   }, []);
+
+  // Draw the trace onto the map (route line, slope overlay, terminus dots, POI
+  // markers) and frame it. Pure map mutations synced to the `trace` prop — this
+  // is genuine external-system synchronization, so an effect is the right tool.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const routeSrc = map.getSource("route") as GeoJSONSource | undefined;
+      const slopeSrc = map.getSource("slope") as GeoJSONSource | undefined;
+      const terminusSrc = map.getSource("terminus") as GeoJSONSource | undefined;
+      if (!routeSrc || !slopeSrc || !terminusSrc) {
+        console.warn("[varde/map] trace effect: sources not ready", {
+          routeSrc: !!routeSrc,
+          slopeSrc: !!slopeSrc,
+          terminusSrc: !!terminusSrc,
+        });
+        return;
+      }
+
+      const route = trace?.route;
+      console.log("[varde/map] draw trace", { points: route?.length ?? 0 });
+      const markers = markersRef.current;
+      if (!route || route.length < 1) {
+        routeSrc.setData(EMPTY_FC);
+        slopeSrc.setData(EMPTY_FC);
+        terminusSrc.setData(EMPTY_FC);
+        markers.forEach(({ marker }) => marker.remove());
+        markers.clear();
+        return;
+      }
+
+      const routeFeature: Feature<LineString> = {
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: routeCoords(route) },
+        properties: {},
+      };
+      routeSrc.setData(routeFeature);
+      slopeSrc.setData({ type: "FeatureCollection", features: buildSlopeFeatures(route) });
+
+      const first = route[0];
+      const last = route[route.length - 1];
+      terminusSrc.setData({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [first.lng, first.lat] },
+            properties: { kind: "start" },
+          },
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [last.lng, last.lat] },
+            properties: { kind: "finish" },
+          },
+        ],
+      });
+
+      // Rebuild POI markers from scratch (none derived from GPX today, but the
+      // import flow may add them later — this keeps the layer correct).
+      markers.forEach(({ marker }) => marker.remove());
+      markers.clear();
+      for (const poi of trace?.pois ?? []) {
+        const at = pointAtKm(route, poi.km);
+        const el = makeMarkerElement(poi, () => {
+          const next = selectedPoiRef.current === poi.id ? null : poi.id;
+          setSelectedPoiRef.current(next);
+        });
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat([at.lng, at.lat])
+          .addTo(map);
+        markers.set(poi.id, { marker, el });
+      }
+
+      // Single-pass bbox. Degenerate (single-location) tracks yield a zero-area
+      // box, which fitBounds centres + clamps via maxZoom — no NaN since the
+      // parser already drops non-finite coordinates.
+      let w = Infinity;
+      let s = Infinity;
+      let e = -Infinity;
+      let n = -Infinity;
+      for (const p of route) {
+        if (p.lng < w) w = p.lng;
+        if (p.lng > e) e = p.lng;
+        if (p.lat < s) s = p.lat;
+        if (p.lat > n) n = p.lat;
+      }
+      console.log("[varde/map] fitBounds", { w, s, e, n });
+      map.fitBounds([[w, s], [e, n]], { padding: 60, maxZoom: 14 });
+    };
+    if (readyRef.current) {
+      apply();
+    } else {
+      console.log("[varde/map] trace effect deferred until map load");
+      map.once("load", apply);
+    }
+  }, [trace]);
 
   // Slope layer visibility.
   useEffect(() => {

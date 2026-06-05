@@ -31,10 +31,7 @@ export default function Page() {
   const [importOpen, setImportOpen] = useState(false);
   const [waterLoading, setWaterLoading] = useState(false);
 
-  // Real settable state, not a hardcoded null: the GPX import flow becomes the
-  // producer by destructuring `setTrace` here and wiring it. No producer exists
-  // yet, so the view stays in its empty state.
-  const [trace] = useState<Trace | null>(null);
+  const [trace, setTrace] = useState<Trace | null>(null);
 
   const route = trace?.route ?? [];
   const pois = trace?.pois ?? [];
@@ -206,9 +203,12 @@ export default function Page() {
       <ImportModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onDone={() => {
+        onImported={(t) => {
+          setTrace(t);
           setImportOpen(false);
           setView("plan");
+          setSelectedSeg(null);
+          setSelectedPoi(null);
         }}
       />
     </div>

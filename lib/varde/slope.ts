@@ -3,20 +3,20 @@
 
 type RGB = readonly [number, number, number];
 
-// Uphill: green → yellow → orange → red, saturating at 30 %.
+// Uphill: yellow (gentle) → orange → red (steep), saturating at 30 %.
 const UP_STOPS: ReadonlyArray<RGB> = [
-  [126, 168, 116],
-  [214, 198, 92],
-  [212, 140, 56],
-  [196, 64, 40],
+  [235, 205, 65],
+  [225, 130, 45],
+  [198, 45, 38],
 ];
 
-// Downhill: cyan → blue → indigo → violet, saturating at 30 %.
+// Downhill: blue (gentle) → green → deep green (steep), saturating at 30 %.
+// Green dominates the ramp: blue only at the very start, so even moderate
+// descents read green rather than staying blue.
 const DOWN_STOPS: ReadonlyArray<RGB> = [
-  [120, 188, 196],
-  [70, 140, 200],
-  [86, 92, 196],
-  [120, 60, 168],
+  [60, 120, 205],
+  [60, 175, 110],
+  [35, 120, 60],
 ];
 
 function lerp(a: number, b: number, t: number): number {
