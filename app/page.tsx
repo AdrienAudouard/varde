@@ -7,12 +7,12 @@ import { LeftRail, type View } from "@/components/varde/left-rail";
 import { TopBar } from "@/components/varde/top-bar";
 import type { AutonomyMode } from "@/components/varde/topo-map";
 import { ElevationProfile } from "@/components/varde/elevation-profile";
-import { AutonomyPanel } from "@/components/varde/autonomy-panel";
-import { RecapTable } from "@/components/varde/recap-table";
+import { AutonomyPanels, type AutonomyTab } from "@/components/varde/autonomy-panels";
 import { PoiDetail } from "@/components/varde/poi-detail";
 import { Library } from "@/components/varde/library";
 import { ImportModal } from "@/components/varde/import-modal";
 import { buildSegments, type Trace } from "@/lib/varde/data";
+import { buildTerrain } from "@/lib/varde/terrain";
 
 // MapLibre touches `window` at module load — keep it out of the server bundle.
 const TopoMap = dynamic(
@@ -26,17 +26,33 @@ export default function Page() {
   const [view, setView] = useState<View>("plan");
   const [slopeOn, setSlopeOn] = useState(false);
   const [hoverKm, setHoverKm] = useState<number | null>(null);
-  const [selectedSeg, setSelectedSeg] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<AutonomyTab>("water");
+  const [selected, setSelected] = useState<number | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [waterLoading, setWaterLoading] = useState(false);
 
   const [trace, setTrace] = useState<Trace | null>(null);
 
-  const route = trace?.route ?? [];
+  const route = useMemo(() => trace?.route ?? [], [trace]);
   const pois = trace?.pois ?? [];
   const segments = useMemo(() => buildSegments(trace), [trace]);
+  const terrain = useMemo(() => buildTerrain(route), [route]);
   const hasTrace = trace != null;
+
+  // The bands shown on the map/profile follow the active tab, so a single
+  // km-range selection model drives both the highlight and the band rects.
+  const bands = useMemo(
+    () =>
+      activeTab === "water"
+        ? segments.map((s) => ({ fromKm: s.from.km, toKm: s.to.km }))
+        : terrain.map((t) => ({ fromKm: t.fromKm, toKm: t.toKm })),
+    [activeTab, segments, terrain],
+  );
+  const selectedRange = useMemo(
+    () => (selected != null ? bands[selected] ?? null : null),
+    [selected, bands],
+  );
 
   const selectedPoiData = selectedPoi != null ? pois.find((p) => p.id === selectedPoi) ?? null : null;
   const selectedPoiSeg =
@@ -52,8 +68,6 @@ export default function Page() {
             <TopBar
               trace={trace}
               segments={segments}
-              slopeOn={slopeOn}
-              setSlopeOn={setSlopeOn}
               onImport={() => setImportOpen(true)}
             />
             <div className="plan-body">
@@ -61,11 +75,10 @@ export default function Page() {
                 <div className="map-stage">
                   <TopoMap
                     trace={trace}
-                    segments={segments}
                     slopeOn={slopeOn}
                     hoverKm={hoverKm}
                     setHoverKm={setHoverKm}
-                    selectedSeg={selectedSeg}
+                    selectedRange={selectedRange}
                     autonomyMode={AUTONOMY_MODE}
                     selectedPoi={selectedPoi}
                     setSelectedPoi={setSelectedPoi}
@@ -146,32 +159,27 @@ export default function Page() {
                   <ElevationProfile
                     route={route}
                     pois={pois}
-                    segments={segments}
+                    bands={bands}
                     hoverKm={hoverKm}
                     setHoverKm={setHoverKm}
                     slopeOn={slopeOn}
-                    selectedSeg={selectedSeg}
-                    setSelectedSeg={setSelectedSeg}
+                    selected={selected}
+                    setSelected={setSelected}
                     autonomyMode={AUTONOMY_MODE}
                   />
                 </div>
               </section>
 
               {hasTrace ? (
-                AUTONOMY_MODE === "table" ? (
-                  <RecapTable
-                    segments={segments}
-                    selectedSeg={selectedSeg}
-                    setSelectedSeg={setSelectedSeg}
-                  />
-                ) : (
-                  <AutonomyPanel
-                    segments={segments}
-                    selectedSeg={selectedSeg}
-                    setSelectedSeg={setSelectedSeg}
-                    hoverKm={hoverKm}
-                  />
-                )
+                <AutonomyPanels
+                  segments={segments}
+                  terrain={terrain}
+                  selected={selected}
+                  setSelected={setSelected}
+                  hoverKm={hoverKm}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                />
               ) : (
                 <aside className="autonomy">
                   <div className="empty-state">
@@ -207,7 +215,7 @@ export default function Page() {
           setTrace(t);
           setImportOpen(false);
           setView("plan");
-          setSelectedSeg(null);
+          setSelected(null);
           setSelectedPoi(null);
         }}
       />

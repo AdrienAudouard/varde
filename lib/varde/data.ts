@@ -116,7 +116,7 @@ export function gradeAt(route: readonly RoutePoint[], i: number): number {
 
 // Naismith-style pace model: flat speed + climbing penalty + light descent penalty.
 const BASE_KMH = 7.2;
-function segTime(dist: number, dp: number, dm: number): number {
+export function segTime(dist: number, dp: number, dm: number): number {
   const flatH = dist / BASE_KMH;
   const climbH = (dp / 100) * (10 / 60);
   const descH = (dm / 100) * (3.5 / 60);

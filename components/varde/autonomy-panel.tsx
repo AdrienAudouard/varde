@@ -5,8 +5,8 @@ import { fmtDur, fmtTime, type Segment } from "@/lib/varde/data";
 
 type AutonomyPanelProps = {
   segments: readonly Segment[];
-  selectedSeg: number | null;
-  setSelectedSeg: (i: number | null) => void;
+  selected: number | null;
+  setSelected: (i: number | null) => void;
   hoverKm: number | null;
 };
 
@@ -22,12 +22,12 @@ function WaterGauge({ liters }: { liters: number }) {
   );
 }
 
-export function AutonomyPanel({ segments, selectedSeg, setSelectedSeg, hoverKm }: AutonomyPanelProps) {
+export function AutonomyPanel({ segments, selected, setSelected, hoverKm }: AutonomyPanelProps) {
   const totalWater = segments.reduce((a, s) => a + s.water, 0);
   const longest = segments.reduce((a, s) => Math.max(a, s.dist), 0);
   const maxWater = segments.reduce((a, s) => Math.max(a, s.water), 0);
   return (
-    <aside className="autonomy">
+    <>
       <div className="au-head">
         <h2>Plan d&apos;autonomie</h2>
         <p>Entre chaque point d&apos;eau : ce qu&apos;il faut prévoir.</p>
@@ -54,7 +54,7 @@ export function AutonomyPanel({ segments, selectedSeg, setSelectedSeg, hoverKm }
       </div>
       <div className="au-list">
         {segments.map((s, i) => {
-          const active = selectedSeg === i;
+          const active = selected === i;
           const here = hoverKm != null && hoverKm >= s.from.km && hoverKm <= s.to.km;
           return (
             <div
@@ -62,11 +62,11 @@ export function AutonomyPanel({ segments, selectedSeg, setSelectedSeg, hoverKm }
               role="button"
               tabIndex={0}
               className={"segcard" + (active ? " active" : "") + (here ? " here" : "")}
-              onClick={() => setSelectedSeg(active ? null : i)}
+              onClick={() => setSelected(active ? null : i)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setSelectedSeg(active ? null : i);
+                  setSelected(active ? null : i);
                 }
               }}
             >
@@ -111,6 +111,6 @@ export function AutonomyPanel({ segments, selectedSeg, setSelectedSeg, hoverKm }
         <span>Total à boire estimé</span>
         <strong>{totalWater.toFixed(1).replace(".", ",")} L</strong>
       </div>
-    </aside>
+    </>
   );
 }

@@ -7,7 +7,6 @@ import {
   type Poi,
   type PoiType,
   type RoutePoint,
-  type Segment,
 } from "@/lib/varde/data";
 import { slopeColor } from "@/lib/varde/slope";
 import type { AutonomyMode } from "@/components/varde/topo-map";
@@ -15,12 +14,12 @@ import type { AutonomyMode } from "@/components/varde/topo-map";
 type ElevationProfileProps = {
   route: readonly RoutePoint[];
   pois: readonly Poi[];
-  segments: readonly Segment[];
+  bands: readonly { fromKm: number; toKm: number }[];
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
   slopeOn: boolean;
-  selectedSeg: number | null;
-  setSelectedSeg: (i: number | null) => void;
+  selected: number | null;
+  setSelected: (i: number | null) => void;
   autonomyMode: AutonomyMode;
 };
 
@@ -40,12 +39,12 @@ const POI_COLOR: Record<PoiType, string> = {
 export function ElevationProfile({
   route,
   pois,
-  segments,
+  bands,
   hoverKm,
   setHoverKm,
   slopeOn,
-  selectedSeg,
-  setSelectedSeg,
+  selected,
+  setSelected,
   autonomyMode,
 }: ElevationProfileProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -162,15 +161,15 @@ export function ElevationProfile({
         </g>
 
         {autonomyMode !== "badges" &&
-          segments.map((s, i) => (
+          bands.map((b, i) => (
             <rect
               key={i}
-              x={xOf(s.from.km)}
+              x={xOf(b.fromKm)}
               y={PAD_T}
-              width={xOf(s.to.km) - xOf(s.from.km)}
+              width={xOf(b.toKm) - xOf(b.fromKm)}
               height={plotH}
-              className={"seg-band" + (selectedSeg === i ? " active" : "")}
-              onClick={() => setSelectedSeg(selectedSeg === i ? null : i)}
+              className={"seg-band" + (selected === i ? " active" : "")}
+              onClick={() => setSelected(selected === i ? null : i)}
               style={{ cursor: "pointer" }}
             />
           ))}

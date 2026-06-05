@@ -10,8 +10,6 @@ import { fmtDur, type Segment, type Trace } from "@/lib/varde/data";
 type TopBarProps = {
   trace: Trace | null;
   segments: readonly Segment[];
-  slopeOn: boolean;
-  setSlopeOn: (v: boolean) => void;
   onImport: () => void;
 };
 
@@ -35,7 +33,7 @@ function Stat({ label, val, sub }: StatProps) {
   );
 }
 
-export function TopBar({ trace, segments, slopeOn, setSlopeOn, onImport }: TopBarProps) {
+export function TopBar({ trace, segments, onImport }: TopBarProps) {
   const hasTrace = trace != null && segments.length > 0;
 
   const totalKm = trace != null && trace.route.length > 0 ? trace.route[trace.route.length - 1].dist : 0;
@@ -83,14 +81,6 @@ export function TopBar({ trace, segments, slopeOn, setSlopeOn, onImport }: TopBa
         />
       </div>
       <div className="tb-actions">
-        <button
-          type="button"
-          className={"btn ghost" + (slopeOn ? " on" : "")}
-          onClick={() => setSlopeOn(!slopeOn)}
-          disabled={!hasTrace}
-        >
-          <Icon name="grad" size={17} /> Calque pente
-        </button>
         <button type="button" className="btn ghost" onClick={onImport}>
           <Icon name="import" size={17} /> Importer GPX
         </button>

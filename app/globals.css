@@ -846,6 +846,29 @@ button {
   flex-direction: column;
   min-height: 0;
 }
+.au-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.au-tab {
+  flex: 1;
+  padding: 13px 8px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: 0.16s;
+}
+.au-tab:hover {
+  color: var(--ink);
+}
+.au-tab[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
 .au-head {
   padding: 20px 20px 14px;
 }
@@ -1014,6 +1037,28 @@ button {
 .ss.down .ss-v {
   color: #3f7a9e;
 }
+.terr-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+  background: var(--card-2);
+}
+.terr-badge.up {
+  color: #b9602f;
+  border-color: color-mix(in srgb, #b9602f 35%, transparent);
+  background: color-mix(in srgb, #b9602f 10%, transparent);
+}
+.terr-badge.down {
+  color: #3f7a9e;
+  border-color: color-mix(in srgb, #3f7a9e 35%, transparent);
+  background: color-mix(in srgb, #3f7a9e 10%, transparent);
+}
 .wgauge {
   display: flex;
   align-items: center;
@@ -1052,51 +1097,6 @@ button {
   font-size: 18px;
   color: var(--ink);
   font-weight: 700;
-}
-
-/* recap table */
-.recap .rt-wrap {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 16px;
-}
-.rtable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.rtable th {
-  text-align: left;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-2);
-  font-weight: 700;
-  padding: 8px 8px;
-  border-bottom: 1px solid var(--line);
-}
-.rtable td {
-  padding: 11px 8px;
-  border-bottom: 1px solid var(--line-2);
-}
-.rtable tr {
-  cursor: pointer;
-}
-.rtable tbody tr:hover {
-  background: var(--card);
-}
-.rtable tr.active {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.rt-name {
-  font-weight: 700;
-}
-.rtable .up {
-  color: #b9602f;
-}
-.rtable .mono {
-  font-size: 12.5px;
-  white-space: nowrap;
 }
 
 /* poi detail */

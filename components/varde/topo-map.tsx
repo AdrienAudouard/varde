@@ -3,7 +3,7 @@
 // MapLibre GL JS swap-in for the previous SVG placeholder.
 // Renders the trace, slope overlay, selected-segment highlight, hover marker,
 // and POI markers on top of a real cartographic basemap (MapTiler Landscape).
-// All interaction contracts (hoverKm sync, selectedPoi, selectedSeg, slopeOn)
+// All interaction contracts (hoverKm sync, selectedPoi, selectedRange, slopeOn)
 // match the previous component so the rest of the planning view is untouched.
 
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +21,6 @@ import {
   type Poi,
   type PoiType,
   type RoutePoint,
-  type Segment,
   type Trace,
 } from "@/lib/varde/data";
 import { slopeColor } from "@/lib/varde/slope";
@@ -37,11 +36,10 @@ export type AutonomyMode = "panel" | "badges" | "table";
 
 type TopoMapProps = {
   trace: Trace | null;
-  segments: readonly Segment[];
   slopeOn: boolean;
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
-  selectedSeg: number | null;
+  selectedRange: { fromKm: number; toKm: number } | null;
   autonomyMode: AutonomyMode;
   selectedPoi: string | null;
   setSelectedPoi: (id: string | null) => void;
@@ -214,11 +212,10 @@ function makeMarkerElement(poi: Poi, onActivate: () => void): HTMLButtonElement 
 // the rest of the planning view's API is unchanged; we just don't read it here.
 export function TopoMap({
   trace,
-  segments,
   slopeOn,
   hoverKm,
   setHoverKm,
-  selectedSeg,
+  selectedRange,
   selectedPoi,
   setSelectedPoi,
   onWaterLoadingChange,
@@ -637,18 +634,17 @@ export function TopoMap({
     const apply = () => {
       const source = map.getSource("seg-hi") as GeoJSONSource | undefined;
       if (!source) return;
-      if (selectedSeg == null) {
+      if (selectedRange == null) {
         source.setData(EMPTY_FC);
         return;
       }
-      const seg = segments[selectedSeg];
       const route = trace?.route;
-      if (!seg || !route) {
+      if (!route) {
         source.setData(EMPTY_FC);
         return;
       }
       const coords = route
-        .filter((p) => p.dist >= seg.from.km && p.dist <= seg.to.km)
+        .filter((p) => p.dist >= selectedRange.fromKm && p.dist <= selectedRange.toKm)
         .map((p) => [p.lng, p.lat]);
       if (coords.length < 2) {
         source.setData(EMPTY_FC);
@@ -663,7 +659,7 @@ export function TopoMap({
     };
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [selectedSeg, segments, trace]);
+  }, [selectedRange, trace]);
 
   // Hover marker (bi-directional sync with the elevation profile).
   useEffect(() => {
