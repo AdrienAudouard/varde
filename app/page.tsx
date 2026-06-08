@@ -13,6 +13,8 @@ import { Library } from "@/components/varde/library";
 import { ImportModal } from "@/components/varde/import-modal";
 import { buildSegments, type Trace } from "@/lib/varde/data";
 import { buildTerrain } from "@/lib/varde/terrain";
+import { waterPointsToPois } from "@/lib/varde/water-proximity";
+import { useRouteWaterPoints } from "@/components/varde/use-route-water-points";
 
 // MapLibre touches `window` at module load — keep it out of the server bundle.
 const TopoMap = dynamic(
@@ -30,13 +32,27 @@ export default function Page() {
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [waterLoading, setWaterLoading] = useState(false);
 
   const [trace, setTrace] = useState<Trace | null>(null);
 
   const route = useMemo(() => trace?.route ?? [], [trace]);
-  const pois = trace?.pois ?? [];
-  const segments = useMemo(() => buildSegments(trace), [trace]);
+
+  // Single Overpass fetch for the whole route; projected onto the path and
+  // merged into the trace so the pure `buildSegments` picks the water points up.
+  const { waterPoints, isLoading: waterLoading, error: waterError } = useRouteWaterPoints(route);
+  const derivedPois = useMemo(
+    () => waterPointsToPois(route, waterPoints),
+    [route, waterPoints],
+  );
+  // Spread keeps `route` referentially stable, so the map's geometry/fitBounds
+  // effect (keyed on `trace?.route`) won't re-fire when derived pois arrive.
+  const mergedTrace = useMemo<Trace | null>(
+    () => (trace ? { ...trace, pois: [...trace.pois, ...derivedPois] } : null),
+    [trace, derivedPois],
+  );
+
+  const pois = mergedTrace?.pois ?? [];
+  const segments = useMemo(() => buildSegments(mergedTrace), [mergedTrace]);
   const terrain = useMemo(() => buildTerrain(route), [route]);
   const hasTrace = trace != null;
 
@@ -74,7 +90,8 @@ export default function Page() {
               <section className="map-col">
                 <div className="map-stage">
                   <TopoMap
-                    trace={trace}
+                    trace={mergedTrace}
+                    waterPoints={waterPoints}
                     slopeOn={slopeOn}
                     hoverKm={hoverKm}
                     setHoverKm={setHoverKm}
@@ -82,8 +99,12 @@ export default function Page() {
                     autonomyMode={AUTONOMY_MODE}
                     selectedPoi={selectedPoi}
                     setSelectedPoi={setSelectedPoi}
-                    onWaterLoadingChange={setWaterLoading}
                   />
+                  {waterError && (
+                    <div className="varde-water-error" role="status">
+                      Overpass API : {waterError}
+                    </div>
+                  )}
                   <div className="map-ctrls">
                     <button type="button" className="mc-btn">
                       +

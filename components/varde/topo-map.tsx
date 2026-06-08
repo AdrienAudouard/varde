@@ -6,7 +6,7 @@
 // All interaction contracts (hoverKm sync, selectedPoi, selectedRange, slopeOn)
 // match the previous component so the rest of the planning view is untouched.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import maplibregl, {
   type ExpressionSpecification,
   type GeoJSONSource,
@@ -26,8 +26,6 @@ import {
 import { slopeColor } from "@/lib/varde/slope";
 import {
   KIND_LABEL,
-  fetchWaterPoints,
-  type Bbox,
   type WaterPoint,
   type WaterPointKind,
 } from "@/lib/varde/overpass";
@@ -36,6 +34,10 @@ export type AutonomyMode = "panel" | "badges" | "table";
 
 type TopoMapProps = {
   trace: Trace | null;
+  /** OSM water points for the route area, fetched once per trace by the page.
+   *  Rendered as the secondary `osm-water` layer; the page also projects them
+   *  into the trace's pois for the autonomy plan. */
+  waterPoints: readonly WaterPoint[];
   slopeOn: boolean;
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
@@ -43,9 +45,6 @@ type TopoMapProps = {
   autonomyMode: AutonomyMode;
   selectedPoi: string | null;
   setSelectedPoi: (id: string | null) => void;
-  /** Notified when an Overpass water-point fetch starts (`true`) or settles
-   *  (`false`). Used by the legend to show a spinner. */
-  onWaterLoadingChange?: (loading: boolean) => void;
 };
 
 // Initial camera when no trace is loaded: centred on the French Alps
@@ -212,18 +211,15 @@ function makeMarkerElement(poi: Poi, onActivate: () => void): HTMLButtonElement 
 // the rest of the planning view's API is unchanged; we just don't read it here.
 export function TopoMap({
   trace,
+  waterPoints,
   slopeOn,
   hoverKm,
   setHoverKm,
   selectedRange,
   selectedPoi,
   setSelectedPoi,
-  onWaterLoadingChange,
 }: TopoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // Surfaces Overpass failures in the UI — the public endpoint can rate-limit
-  // or 5xx on rapid pans, and a silent catch hid that completely.
-  const [waterError, setWaterError] = useState<string | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const readyRef = useRef(false);
   const markersRef = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
@@ -237,7 +233,6 @@ export function TopoMap({
   const setHoverKmRef = useRef(setHoverKm);
   const setSelectedPoiRef = useRef(setSelectedPoi);
   const selectedPoiRef = useRef(selectedPoi);
-  const onWaterLoadingChangeRef = useRef(onWaterLoadingChange);
   // Latest trace, read by the persistent map handlers (mousemove → nearest
   // route point) without re-mounting the map. Trace-dependent layers are only
   // added on `load` when a trace exists — a dormant seam until GPX import lands.
@@ -254,9 +249,6 @@ export function TopoMap({
   useEffect(() => {
     selectedPoiRef.current = selectedPoi;
   }, [selectedPoi]);
-  useEffect(() => {
-    onWaterLoadingChangeRef.current = onWaterLoadingChange;
-  }, [onWaterLoadingChange]);
 
   // Mount / unmount the map once. All later updates go through setData /
   // setLayoutProperty against the live map instance.
@@ -408,80 +400,7 @@ export function TopoMap({
       });
 
       readyRef.current = true;
-      // Kick off the first Overpass fetch now that the source exists.
-      scheduleWaterFetch(0);
     });
-
-    // --- Overpass: fetch OSM water points for the current viewport ----------
-    // Debounced refetch on every moveend; in-flight requests are aborted when
-    // a new one starts; identical or contained bounding boxes are skipped via
-    // `bboxContains`.
-    let waterFetchTimer: number | null = null;
-    let waterFetchAbort: AbortController | null = null;
-    let lastFetchedBbox: Bbox | null = null;
-
-    // True when `inner` is fully contained in `outer` — used to skip refetch
-    // when the user pans inside an area we already have data for.
-    function bboxContains(outer: Bbox, inner: Bbox): boolean {
-      const [w1, s1, e1, n1] = outer;
-      const [w2, s2, e2, n2] = inner;
-      return w2 >= w1 && s2 >= s1 && e2 <= e1 && n2 <= n1;
-    }
-
-    async function runWaterFetch() {
-      if (!readyRef.current) return;
-      if (map.getZoom() < 9) return;
-      const b = map.getBounds();
-      const bbox: Bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-      if (lastFetchedBbox && bboxContains(lastFetchedBbox, bbox)) return;
-      lastFetchedBbox = bbox;
-
-      waterFetchAbort?.abort();
-      const ctrl = new AbortController();
-      waterFetchAbort = ctrl;
-      onWaterLoadingChangeRef.current?.(true);
-      try {
-        const points = await fetchWaterPoints(bbox, ctrl.signal);
-        // If aborted by a newer fetch, *don't* flip loading to false — the
-        // replacement fetch already set it to true and owns the lifecycle.
-        if (ctrl.signal.aborted) return;
-        waterPointsRef.current = new Map(points.map((p) => [p.id, p]));
-        const source = map.getSource("osm-water") as GeoJSONSource | undefined;
-        if (!source) return;
-        const features: Array<Feature<Point, { id: number; kind: WaterPointKind }>> = points.map(
-          (p) => ({
-            type: "Feature",
-            geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-            properties: { id: p.id, kind: p.kind },
-          }),
-        );
-        source.setData({ type: "FeatureCollection", features });
-        setWaterError(null);
-        onWaterLoadingChangeRef.current?.(false);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        // Clear the cached bbox so the next pan retries (otherwise a transient
-        // failure would lock us out until the user pans entirely outside this bbox).
-        lastFetchedBbox = null;
-        // Drop any previously-rendered points: stale markers from the prior
-        // viewport are misleading once we know the current view's data is
-        // unknown. The error banner explains the empty state.
-        waterPointsRef.current.clear();
-        const source = map.getSource("osm-water") as GeoJSONSource | undefined;
-        source?.setData(EMPTY_FC);
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[varde/overpass] fetch failed", err);
-        setWaterError(msg);
-        onWaterLoadingChangeRef.current?.(false);
-      }
-    }
-
-    function scheduleWaterFetch(delayMs: number) {
-      if (waterFetchTimer != null) window.clearTimeout(waterFetchTimer);
-      waterFetchTimer = window.setTimeout(runWaterFetch, delayMs);
-    }
-
-    map.on("moveend", () => scheduleWaterFetch(400));
 
     const handleMove = (e: MapMouseEvent) => {
       const route = traceRef.current?.route;
@@ -507,8 +426,6 @@ export function TopoMap({
     map.on("mouseout", () => setHoverKmRef.current(null));
 
     return () => {
-      if (waterFetchTimer != null) window.clearTimeout(waterFetchTimer);
-      waterFetchAbort?.abort();
       markers.forEach(({ marker }) => marker.remove());
       markers.clear();
       map.remove();
@@ -517,9 +434,34 @@ export function TopoMap({
     };
   }, []);
 
-  // Draw the trace onto the map (route line, slope overlay, terminus dots, POI
-  // markers) and frame it. Pure map mutations synced to the `trace` prop — this
-  // is genuine external-system synchronization, so an effect is the right tool.
+  // Render the OSM water-point layer from the prop, and keep `waterPointsRef`
+  // in sync so the click popup can resolve a node's full details by id. Keyed on
+  // the prop so the page's single fetch resolving repaints just this layer —
+  // never the route geometry. Defers until the map's sources exist.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const source = map.getSource("osm-water") as GeoJSONSource | undefined;
+      if (!source) return;
+      waterPointsRef.current = new Map(waterPoints.map((p) => [p.id, p]));
+      const features: Array<Feature<Point, { id: number; kind: WaterPointKind }>> =
+        waterPoints.map((p) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+          properties: { id: p.id, kind: p.kind },
+        }));
+      source.setData({ type: "FeatureCollection", features });
+    };
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [waterPoints]);
+
+  // Draw the route geometry (line, slope overlay, terminus dots) and frame it.
+  // Keyed on `trace?.route` only — POI markers live in their own effect below so
+  // the page's async water fetch resolving (which changes `trace.pois` but keeps
+  // the same `route` array) never re-frames the map. Pure external-system sync.
+  const route = trace?.route;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -527,24 +469,12 @@ export function TopoMap({
       const routeSrc = map.getSource("route") as GeoJSONSource | undefined;
       const slopeSrc = map.getSource("slope") as GeoJSONSource | undefined;
       const terminusSrc = map.getSource("terminus") as GeoJSONSource | undefined;
-      if (!routeSrc || !slopeSrc || !terminusSrc) {
-        console.warn("[varde/map] trace effect: sources not ready", {
-          routeSrc: !!routeSrc,
-          slopeSrc: !!slopeSrc,
-          terminusSrc: !!terminusSrc,
-        });
-        return;
-      }
+      if (!routeSrc || !slopeSrc || !terminusSrc) return;
 
-      const route = trace?.route;
-      console.log("[varde/map] draw trace", { points: route?.length ?? 0 });
-      const markers = markersRef.current;
       if (!route || route.length < 1) {
         routeSrc.setData(EMPTY_FC);
         slopeSrc.setData(EMPTY_FC);
         terminusSrc.setData(EMPTY_FC);
-        markers.forEach(({ marker }) => marker.remove());
-        markers.clear();
         return;
       }
 
@@ -574,22 +504,6 @@ export function TopoMap({
         ],
       });
 
-      // Rebuild POI markers from scratch (none derived from GPX today, but the
-      // import flow may add them later — this keeps the layer correct).
-      markers.forEach(({ marker }) => marker.remove());
-      markers.clear();
-      for (const poi of trace?.pois ?? []) {
-        const at = pointAtKm(route, poi.km);
-        const el = makeMarkerElement(poi, () => {
-          const next = selectedPoiRef.current === poi.id ? null : poi.id;
-          setSelectedPoiRef.current(next);
-        });
-        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-          .setLngLat([at.lng, at.lat])
-          .addTo(map);
-        markers.set(poi.id, { marker, el });
-      }
-
       // Single-pass bbox. Degenerate (single-location) tracks yield a zero-area
       // box, which fitBounds centres + clamps via maxZoom — no NaN since the
       // parser already drops non-finite coordinates.
@@ -603,16 +517,41 @@ export function TopoMap({
         if (p.lat < s) s = p.lat;
         if (p.lat > n) n = p.lat;
       }
-      console.log("[varde/map] fitBounds", { w, s, e, n });
       map.fitBounds([[w, s], [e, n]], { padding: 60, maxZoom: 14 });
     };
-    if (readyRef.current) {
-      apply();
-    } else {
-      console.log("[varde/map] trace effect deferred until map load");
-      map.once("load", apply);
-    }
-  }, [trace]);
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [route]);
+
+  // Rebuild POI markers when the trace's pois change (including the water points
+  // the page derives from the async Overpass fetch). Reads the route from
+  // `traceRef` so it isn't keyed on geometry — only re-runs when pois change.
+  const pois = trace?.pois;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const markers = markersRef.current;
+      markers.forEach(({ marker }) => marker.remove());
+      markers.clear();
+      const currentRoute = traceRef.current?.route;
+      if (!currentRoute || currentRoute.length < 1) return;
+      for (const poi of pois ?? []) {
+        const at = pointAtKm(currentRoute, poi.km);
+        const el = makeMarkerElement(poi, () => {
+          const next = selectedPoiRef.current === poi.id ? null : poi.id;
+          setSelectedPoiRef.current(next);
+        });
+        if (poi.id === selectedPoiRef.current) el.classList.add("sel");
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat([at.lng, at.lat])
+          .addTo(map);
+        markers.set(poi.id, { marker, el });
+      }
+    };
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [pois]);
 
   // Slope layer visibility.
   useEffect(() => {
@@ -692,14 +631,5 @@ export function TopoMap({
     }
   }, [selectedPoi]);
 
-  return (
-    <>
-      <div ref={containerRef} className="topomap" />
-      {waterError && (
-        <div className="varde-water-error" role="status">
-          Overpass API : {waterError}
-        </div>
-      )}
-    </>
-  );
+  return <div ref={containerRef} className="topomap" />;
 }
