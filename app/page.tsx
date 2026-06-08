@@ -3,13 +3,11 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/varde/icon";
-import { LeftRail, type View } from "@/components/varde/left-rail";
 import { TopBar } from "@/components/varde/top-bar";
 import type { AutonomyMode } from "@/components/varde/topo-map";
 import { ElevationProfile } from "@/components/varde/elevation-profile";
 import { AutonomyPanels, type AutonomyTab } from "@/components/varde/autonomy-panels";
 import { PoiDetail } from "@/components/varde/poi-detail";
-import { Library } from "@/components/varde/library";
 import { ImportModal } from "@/components/varde/import-modal";
 import { buildSegments, type Trace } from "@/lib/varde/data";
 import { buildTerrain } from "@/lib/varde/terrain";
@@ -26,7 +24,6 @@ const TopoMap = dynamic(
 const AUTONOMY_MODE: AutonomyMode = "panel";
 
 export default function Page() {
-  const [view, setView] = useState<View>("plan");
   const [slopeOn, setSlopeOn] = useState(false);
   const [terrainSlopeOn, setTerrainSlopeOn] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -108,200 +105,192 @@ export default function Page() {
 
   return (
     <div className="app">
-      <LeftRail view={view} setView={setView} />
-
       <main className="main">
-        {view === "plan" && (
-          <>
-            <TopBar
-              trace={trace}
-              segments={segments}
-              onImport={() => setImportOpen(true)}
-            />
-            <div className="plan-body">
-              <section className="map-col">
-                <div className="map-stage">
-                  <TopoMap
-                    trace={mergedTrace}
-                    waterPoints={waterPoints}
-                    slopeOn={slopeOn}
-                    terrainSlopeOn={terrainSlopeOn}
-                    locateTarget={locateTarget}
-                    hoverKm={hoverKm}
-                    setHoverKm={setHoverKm}
-                    selectedRange={selectedRange}
-                    autonomyMode={AUTONOMY_MODE}
-                    selectedPoi={selectedPoi}
-                    setSelectedPoi={setSelectedPoi}
-                  />
-                  {waterError && (
-                    <div className="varde-water-error" role="status">
-                      Overpass API : {waterError}
-                    </div>
+        <TopBar
+          trace={trace}
+          segments={segments}
+          onImport={() => setImportOpen(true)}
+        />
+        <div className="plan-body">
+          <section className="map-col">
+            <div className="map-stage">
+              <TopoMap
+                trace={mergedTrace}
+                waterPoints={waterPoints}
+                slopeOn={slopeOn}
+                terrainSlopeOn={terrainSlopeOn}
+                locateTarget={locateTarget}
+                hoverKm={hoverKm}
+                setHoverKm={setHoverKm}
+                selectedRange={selectedRange}
+                autonomyMode={AUTONOMY_MODE}
+                selectedPoi={selectedPoi}
+                setSelectedPoi={setSelectedPoi}
+              />
+              {waterError && (
+                <div className="varde-water-error" role="status">
+                  Overpass API : {waterError}
+                </div>
+              )}
+              {locateError && (
+                <div className="varde-water-error" role="status">
+                  {locateError}
+                </div>
+              )}
+              <div className="map-ctrls">
+                <button type="button" className="mc-btn">
+                  +
+                </button>
+                <button type="button" className="mc-btn">
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="mc-btn"
+                  onClick={handleLocate}
+                  disabled={locating}
+                  title="Ma position"
+                  aria-label="Centrer sur ma position"
+                >
+                  {locating ? (
+                    <span
+                      className="varde-spinner"
+                      role="status"
+                      aria-label="Localisation en cours"
+                    />
+                  ) : (
+                    <Icon name="locate" size={18} />
                   )}
-                  {locateError && (
-                    <div className="varde-water-error" role="status">
-                      {locateError}
+                </button>
+                <button
+                  type="button"
+                  className={"mc-btn" + (slopeOn ? " on" : "")}
+                  onClick={() => setSlopeOn(!slopeOn)}
+                  title="Calque pente"
+                >
+                  <Icon name="grad" size={18} />
+                </button>
+                <button
+                  type="button"
+                  className={"mc-btn" + (terrainSlopeOn ? " on" : "")}
+                  onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
+                  title="Carte des pentes"
+                >
+                  <Icon name="layers" size={18} />
+                </button>
+              </div>
+              <div className="map-legends">
+                {terrainSlopeOn && (
+                  <div className="slope-legend terrain-slope-legend">
+                    <span className="tsl-title">Pente du terrain</span>
+                    {SLOPE_BAND_LEGEND.map((band) => (
+                      <div className="sl-row" key={band.label}>
+                        <span className="tsl-sw" style={{ background: band.color }} />
+                        <span className="sl-lab">{band.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {slopeOn ? (
+                  <div className="slope-legend">
+                    <div className="sl-row">
+                      <span className="sl-lab">Montée</span>
+                      <span className="sl-bar up" />
+                      <span className="sl-mx mono">30%+</span>
                     </div>
-                  )}
-                  <div className="map-ctrls">
-                    <button type="button" className="mc-btn">
-                      +
-                    </button>
-                    <button type="button" className="mc-btn">
-                      −
-                    </button>
-                    <button
-                      type="button"
-                      className="mc-btn"
-                      onClick={handleLocate}
-                      disabled={locating}
-                      title="Ma position"
-                      aria-label="Centrer sur ma position"
-                    >
-                      {locating ? (
+                    <div className="sl-row">
+                      <span className="sl-lab">Descente</span>
+                      <span className="sl-bar down" />
+                      <span className="sl-mx mono">30%+</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="map-legend">
+                    <span>
+                      <i className="lg eau" /> Eau
+                      {waterLoading && (
                         <span
                           className="varde-spinner"
                           role="status"
-                          aria-label="Localisation en cours"
+                          aria-label="Chargement des points d'eau"
                         />
-                      ) : (
-                        <Icon name="locate" size={18} />
                       )}
-                    </button>
-                    <button
-                      type="button"
-                      className={"mc-btn" + (slopeOn ? " on" : "")}
-                      onClick={() => setSlopeOn(!slopeOn)}
-                      title="Calque pente"
-                    >
-                      <Icon name="grad" size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      className={"mc-btn" + (terrainSlopeOn ? " on" : "")}
-                      onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
-                      title="Carte des pentes"
-                    >
-                      <Icon name="layers" size={18} />
-                    </button>
-                  </div>
-                  <div className="map-legends">
-                    {terrainSlopeOn && (
-                      <div className="slope-legend terrain-slope-legend">
-                        <span className="tsl-title">Pente du terrain</span>
-                        {SLOPE_BAND_LEGEND.map((band) => (
-                          <div className="sl-row" key={band.label}>
-                            <span className="tsl-sw" style={{ background: band.color }} />
-                            <span className="sl-lab">{band.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {slopeOn ? (
-                      <div className="slope-legend">
-                        <div className="sl-row">
-                          <span className="sl-lab">Montée</span>
-                          <span className="sl-bar up" />
-                          <span className="sl-mx mono">30%+</span>
-                        </div>
-                        <div className="sl-row">
-                          <span className="sl-lab">Descente</span>
-                          <span className="sl-bar down" />
-                          <span className="sl-mx mono">30%+</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="map-legend">
-                        <span>
-                          <i className="lg eau" /> Eau
-                          {waterLoading && (
-                            <span
-                              className="varde-spinner"
-                              role="status"
-                              aria-label="Chargement des points d'eau"
-                            />
-                          )}
-                        </span>
-                        <span>
-                          <i className="lg ravito" /> Ravito
-                        </span>
-                        <span>
-                          <i className="lg refuge" /> Refuge
-                        </span>
-                        <span>
-                          <i className="lg dash" /> À vérifier
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {selectedPoiData && (
-                    <PoiDetail
-                      poi={selectedPoiData}
-                      seg={selectedPoiSeg}
-                      onClose={() => setSelectedPoi(null)}
-                    />
-                  )}
-                </div>
-                <div className="profile-panel">
-                  <div className="pp-head">
-                    <span className="pp-title">Profil altimétrique</span>
-                    <span className="pp-hint mono">
-                      {hoverKm != null
-                        ? `${hoverKm.toFixed(1).replace(".", ",")} km`
-                        : "survole pour explorer"}
+                    </span>
+                    <span>
+                      <i className="lg ravito" /> Ravito
+                    </span>
+                    <span>
+                      <i className="lg refuge" /> Refuge
+                    </span>
+                    <span>
+                      <i className="lg dash" /> À vérifier
                     </span>
                   </div>
-                  <ElevationProfile
-                    route={route}
-                    pois={pois}
-                    bands={bands}
-                    hoverKm={hoverKm}
-                    setHoverKm={setHoverKm}
-                    slopeOn={slopeOn}
-                    selected={selected}
-                    setSelected={setSelected}
-                    autonomyMode={AUTONOMY_MODE}
-                  />
-                </div>
-              </section>
-
-              {hasTrace ? (
-                <AutonomyPanels
-                  segments={segments}
-                  terrain={terrain}
-                  selected={selected}
-                  setSelected={setSelected}
-                  hoverKm={hoverKm}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
+                )}
+              </div>
+              {selectedPoiData && (
+                <PoiDetail
+                  poi={selectedPoiData}
+                  seg={selectedPoiSeg}
+                  onClose={() => setSelectedPoi(null)}
                 />
-              ) : (
-                <aside className="autonomy">
-                  <div className="empty-state">
-                    <div className="empty-state-ic">
-                      <Icon name="route" size={28} />
-                    </div>
-                    <h2 className="empty-state-title">Aucune trace chargée</h2>
-                    <p className="empty-state-text">
-                      Importe un fichier GPX pour visualiser le profil, les points d&apos;eau et le
-                      plan d&apos;autonomie.
-                    </p>
-                    <button
-                      type="button"
-                      className="btn primary"
-                      onClick={() => setImportOpen(true)}
-                    >
-                      <Icon name="import" size={17} /> Importer un GPX
-                    </button>
-                  </div>
-                </aside>
               )}
             </div>
-          </>
-        )}
+            <div className="profile-panel">
+              <div className="pp-head">
+                <span className="pp-title">Profil altimétrique</span>
+                <span className="pp-hint mono">
+                  {hoverKm != null
+                    ? `${hoverKm.toFixed(1).replace(".", ",")} km`
+                    : "survole pour explorer"}
+                </span>
+              </div>
+              <ElevationProfile
+                route={route}
+                pois={pois}
+                bands={bands}
+                hoverKm={hoverKm}
+                setHoverKm={setHoverKm}
+                slopeOn={slopeOn}
+                selected={selected}
+                setSelected={setSelected}
+                autonomyMode={AUTONOMY_MODE}
+              />
+            </div>
+          </section>
 
-        {view === "library" && <Library onImport={() => setImportOpen(true)} />}
+          {hasTrace ? (
+            <AutonomyPanels
+              segments={segments}
+              terrain={terrain}
+              selected={selected}
+              setSelected={setSelected}
+              hoverKm={hoverKm}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+          ) : (
+            <aside className="autonomy">
+              <div className="empty-state">
+                <div className="empty-state-ic">
+                  <Icon name="route" size={28} />
+                </div>
+                <h2 className="empty-state-title">Aucune trace chargée</h2>
+                <p className="empty-state-text">
+                  Importe un fichier GPX pour visualiser le profil, les points d&apos;eau et le
+                  plan d&apos;autonomie.
+                </p>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => setImportOpen(true)}
+                >
+                  <Icon name="import" size={17} /> Importer un GPX
+                </button>
+              </div>
+            </aside>
+          )}
+        </div>
       </main>
 
       <ImportModal
@@ -310,7 +299,6 @@ export default function Page() {
         onImported={(t) => {
           setTrace(t);
           setImportOpen(false);
-          setView("plan");
           setSelected(null);
           setSelectedPoi(null);
         }}

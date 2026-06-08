@@ -108,61 +108,6 @@ button {
   height: 100%;
 }
 
-/* ---- rail ---- */
-.rail {
-  width: 78px;
-  flex: none;
-  background: var(--paper-2);
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 8px;
-  gap: 18px;
-}
-.rail-logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
-  background: var(--card);
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow-sm);
-}
-.rail-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  flex: 1;
-}
-.rail-bottom {
-  width: 100%;
-}
-.rail-btn {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 4px;
-  border-radius: 11px;
-  color: var(--ink-2);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  transition: 0.16s;
-}
-.rail-btn:hover {
-  background: var(--card);
-  color: var(--ink);
-}
-.rail-btn.active {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: var(--shadow-sm);
-}
-
 /* ---- main ---- */
 .main {
   flex: 1;
