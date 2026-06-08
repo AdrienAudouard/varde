@@ -16,18 +16,35 @@ type Rgb = readonly [number, number, number];
 // through — the avalanche-map convention. The user asked for "steep climbs", so
 // if their typical terrain reads too empty, lower the 30° floor here (e.g. to
 // 25) — a one-line change, single source of truth for the renderer and legend.
-type SlopeBand = { readonly minDeg: number; readonly rgb: Rgb; readonly label: string };
+type SlopeBand = { readonly minDeg: number; readonly rgb: Rgb };
 const BANDS: readonly SlopeBand[] = [
-  { minDeg: 30, rgb: [242, 224, 24], label: "30–35°" }, // yellow
-  { minDeg: 35, rgb: [232, 138, 30], label: "35–40°" }, // orange
-  { minDeg: 40, rgb: [216, 49, 43], label: "40–45°" }, // red
-  { minDeg: 45, rgb: [139, 58, 158], label: "≥ 45°" }, // purple
+  { minDeg: 30, rgb: [242, 224, 24] }, // yellow
+  { minDeg: 35, rgb: [232, 138, 30] }, // orange
+  { minDeg: 40, rgb: [216, 49, 43] }, // red
+  { minDeg: 45, rgb: [139, 58, 158] }, // purple
 ];
 
+// Slope angle (°) → grade (%) = tan(angle) × 100, rounded. The legend is shown
+// in grade %, which trail users read more readily than degrees; the underlying
+// classification stays angle-based (the SLF/IGN avalanche-map standard), so the
+// percentages are the exact equivalents of the 30/35/40/45° band edges.
+function gradePercent(deg: number): number {
+  return Math.round(Math.tan((deg * Math.PI) / 180) * 100);
+}
+
 // Legend descriptors derived from the same band table, so the UI legend can
-// never drift from what's actually rendered.
+// never drift from what's actually rendered. Each label is the band's grade-%
+// range; the steepest band is open-ended.
 export const SLOPE_BAND_LEGEND: ReadonlyArray<{ label: string; color: string }> = BANDS.map(
-  (b) => ({ label: b.label, color: `rgb(${b.rgb[0]},${b.rgb[1]},${b.rgb[2]})` }),
+  (b, i) => {
+    const next = BANDS[i + 1];
+    return {
+      label: next
+        ? `${gradePercent(b.minDeg)}–${gradePercent(next.minDeg)}%`
+        : `≥ ${gradePercent(b.minDeg)}%`,
+      color: `rgb(${b.rgb[0]},${b.rgb[1]},${b.rgb[2]})`,
+    };
+  },
 );
 
 // Mapbox / MapTiler terrain-RGB encoding → metres above sea level.
