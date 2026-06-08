@@ -13,6 +13,7 @@ import { Library } from "@/components/varde/library";
 import { ImportModal } from "@/components/varde/import-modal";
 import { buildSegments, type Trace } from "@/lib/varde/data";
 import { buildTerrain } from "@/lib/varde/terrain";
+import { SLOPE_BAND_LEGEND } from "@/lib/varde/terrain-slope";
 import { waterPointsToPois } from "@/lib/varde/water-proximity";
 import { useRouteWaterPoints } from "@/components/varde/use-route-water-points";
 
@@ -27,6 +28,10 @@ const AUTONOMY_MODE: AutonomyMode = "panel";
 export default function Page() {
   const [view, setView] = useState<View>("plan");
   const [slopeOn, setSlopeOn] = useState(false);
+  const [terrainSlopeOn, setTerrainSlopeOn] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
+  const [locateTarget, setLocateTarget] = useState<{ lng: number; lat: number } | null>(null);
   const [hoverKm, setHoverKm] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<AutonomyTab>("water");
   const [selected, setSelected] = useState<number | null>(null);
@@ -74,6 +79,33 @@ export default function Page() {
   const selectedPoiSeg =
     selectedPoiData != null ? segments.find((s) => s.to.km === selectedPoiData.km) ?? null : null;
 
+  // Geolocate: request a one-shot browser fix, then hand the coords to the map
+  // (a fresh object each press re-triggers its fly-to effect). Needs a secure
+  // context (HTTPS / localhost). Errors surface as a transient toast.
+  const handleLocate = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocateError("Géolocalisation non disponible sur cet appareil");
+      return;
+    }
+    setLocating(true);
+    setLocateError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        setLocateTarget({ lng: pos.coords.longitude, lat: pos.coords.latitude });
+      },
+      (err) => {
+        setLocating(false);
+        setLocateError(
+          err.code === err.PERMISSION_DENIED
+            ? "Accès à la position refusé"
+            : "Position indisponible",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  };
+
   return (
     <div className="app">
       <LeftRail view={view} setView={setView} />
@@ -93,6 +125,8 @@ export default function Page() {
                     trace={mergedTrace}
                     waterPoints={waterPoints}
                     slopeOn={slopeOn}
+                    terrainSlopeOn={terrainSlopeOn}
+                    locateTarget={locateTarget}
                     hoverKm={hoverKm}
                     setHoverKm={setHoverKm}
                     selectedRange={selectedRange}
@@ -105,6 +139,11 @@ export default function Page() {
                       Overpass API : {waterError}
                     </div>
                   )}
+                  {locateError && (
+                    <div className="varde-water-error" role="status">
+                      {locateError}
+                    </div>
+                  )}
                   <div className="map-ctrls">
                     <button type="button" className="mc-btn">
                       +
@@ -114,52 +153,88 @@ export default function Page() {
                     </button>
                     <button
                       type="button"
+                      className="mc-btn"
+                      onClick={handleLocate}
+                      disabled={locating}
+                      title="Ma position"
+                      aria-label="Centrer sur ma position"
+                    >
+                      {locating ? (
+                        <span
+                          className="varde-spinner"
+                          role="status"
+                          aria-label="Localisation en cours"
+                        />
+                      ) : (
+                        <Icon name="locate" size={18} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
                       className={"mc-btn" + (slopeOn ? " on" : "")}
                       onClick={() => setSlopeOn(!slopeOn)}
                       title="Calque pente"
                     >
                       <Icon name="grad" size={18} />
                     </button>
-                    <button type="button" className="mc-btn" title="Calques">
+                    <button
+                      type="button"
+                      className={"mc-btn" + (terrainSlopeOn ? " on" : "")}
+                      onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
+                      title="Carte des pentes"
+                    >
                       <Icon name="layers" size={18} />
                     </button>
                   </div>
-                  {slopeOn ? (
-                    <div className="slope-legend">
-                      <div className="sl-row">
-                        <span className="sl-lab">Montée</span>
-                        <span className="sl-bar up" />
-                        <span className="sl-mx mono">30%+</span>
+                  <div className="map-legends">
+                    {terrainSlopeOn && (
+                      <div className="slope-legend terrain-slope-legend">
+                        <span className="tsl-title">Pente du terrain</span>
+                        {SLOPE_BAND_LEGEND.map((band) => (
+                          <div className="sl-row" key={band.label}>
+                            <span className="tsl-sw" style={{ background: band.color }} />
+                            <span className="sl-lab">{band.label}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="sl-row">
-                        <span className="sl-lab">Descente</span>
-                        <span className="sl-bar down" />
-                        <span className="sl-mx mono">30%+</span>
+                    )}
+                    {slopeOn ? (
+                      <div className="slope-legend">
+                        <div className="sl-row">
+                          <span className="sl-lab">Montée</span>
+                          <span className="sl-bar up" />
+                          <span className="sl-mx mono">30%+</span>
+                        </div>
+                        <div className="sl-row">
+                          <span className="sl-lab">Descente</span>
+                          <span className="sl-bar down" />
+                          <span className="sl-mx mono">30%+</span>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="map-legend">
-                      <span>
-                        <i className="lg eau" /> Eau
-                        {waterLoading && (
-                          <span
-                            className="varde-spinner"
-                            role="status"
-                            aria-label="Chargement des points d'eau"
-                          />
-                        )}
-                      </span>
-                      <span>
-                        <i className="lg ravito" /> Ravito
-                      </span>
-                      <span>
-                        <i className="lg refuge" /> Refuge
-                      </span>
-                      <span>
-                        <i className="lg dash" /> À vérifier
-                      </span>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="map-legend">
+                        <span>
+                          <i className="lg eau" /> Eau
+                          {waterLoading && (
+                            <span
+                              className="varde-spinner"
+                              role="status"
+                              aria-label="Chargement des points d'eau"
+                            />
+                          )}
+                        </span>
+                        <span>
+                          <i className="lg ravito" /> Ravito
+                        </span>
+                        <span>
+                          <i className="lg refuge" /> Refuge
+                        </span>
+                        <span>
+                          <i className="lg dash" /> À vérifier
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   {selectedPoiData && (
                     <PoiDetail
                       poi={selectedPoiData}

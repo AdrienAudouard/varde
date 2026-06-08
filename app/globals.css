@@ -627,10 +627,19 @@ button {
   color: #fff;
 }
 
-.map-legend {
+/* Bottom-left legend stack: the persistent route/POI legend sits in the corner,
+   any toggled legend (e.g. the terrain-slope one) stacks above it. Anchored by
+   its bottom edge so it grows upward as legends are added. */
+.map-legends {
   position: absolute;
   left: 14px;
   bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.map-legend {
   display: flex;
   gap: 14px;
   background: var(--card);
@@ -689,9 +698,6 @@ button {
 }
 
 .slope-legend {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
   background: var(--card);
   padding: 10px 12px;
   border-radius: 10px;
@@ -700,6 +706,21 @@ button {
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+/* Terrain slope-angle legend: a small caption + one swatch row per angle band.
+   Reuses the .slope-legend card shell and .sl-row layout. */
+.tsl-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+.tsl-sw {
+  width: 16px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
 }
 .sl-row {
   display: flex;

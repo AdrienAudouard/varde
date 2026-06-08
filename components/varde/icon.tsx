@@ -18,6 +18,7 @@ export type IconName =
   | "check"
   | "house"
   | "fork"
+  | "locate"
   | "grad";
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -118,6 +119,13 @@ const PATHS: Record<IconName, ReactNode> = {
   grad: (
     <g>
       <path d="M3 20h18M3 20L17 6M9 20l8-9" />
+    </g>
+  ),
+  locate: (
+    <g>
+      <circle cx="12" cy="12" r="7" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 1.5v3.5M12 19v3.5M1.5 12h3.5M19 12h3.5" />
     </g>
   ),
 };

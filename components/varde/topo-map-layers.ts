@@ -13,6 +13,7 @@ import {
   STYLE_URL,
   TERMINUS_START,
   TERRAIN_EXAGGERATION,
+  USER_LOC_COLOR,
   maptilerKeyFromStyleUrl,
   osmWaterColorExpr,
 } from "@/components/varde/topo-map-style";
@@ -38,8 +39,9 @@ export function setupTerrain(map: MaplibreMap): void {
 }
 
 // Trace-dependent sources, created unconditionally and seeded empty in insertion
-// order route → slope → terminus → seg-hi → hover so the highlight/hover layers
-// stay on top. The `[trace]` effect fills these when a trace loads.
+// order route → slope → terminus → seg-hi → hover → user-loc so the highlight/
+// hover/position layers stay on top. The `[trace]` effect fills these when a
+// trace loads; `user-loc` is driven separately by the geolocate button.
 export function addTraceLayers(map: MaplibreMap): void {
   map.addSource("route", { type: "geojson", data: EMPTY_FC });
   map.addLayer({
@@ -117,6 +119,27 @@ export function addTraceLayers(map: MaplibreMap): void {
       "circle-color": ACCENT,
       "circle-stroke-color": "#fff",
       "circle-stroke-width": 2,
+    },
+  });
+
+  // "You are here" marker, populated when the geolocate button resolves a fix.
+  // Added last so the live position sits above the route/hover layers.
+  map.addSource("user-loc", { type: "geojson", data: EMPTY_FC });
+  map.addLayer({
+    id: "user-loc-halo",
+    type: "circle",
+    source: "user-loc",
+    paint: { "circle-radius": 12, "circle-color": USER_LOC_COLOR, "circle-opacity": 0.18 },
+  });
+  map.addLayer({
+    id: "user-loc-dot",
+    type: "circle",
+    source: "user-loc",
+    paint: {
+      "circle-radius": 6,
+      "circle-color": USER_LOC_COLOR,
+      "circle-stroke-color": "#fff",
+      "circle-stroke-width": 2.5,
     },
   });
 }

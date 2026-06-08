@@ -28,6 +28,16 @@ import {
   addWaterLayers,
   setupTerrain,
 } from "@/components/varde/topo-map-layers";
+import {
+  TERRAIN_SLOPE_LAYER,
+  addTerrainSlopeLayer,
+  registerTerrainSlopeProtocol,
+} from "@/components/varde/terrain-slope-protocol";
+
+// Register the slope custom protocol once at module load (idempotent), before
+// any map mounts — the protocol must exist before the slope source requests a
+// tile. Safe under React StrictMode's double mount.
+registerTerrainSlopeProtocol();
 
 export type AutonomyMode = "panel" | "badges" | "table";
 
@@ -38,12 +48,18 @@ type TopoMapProps = {
    *  into the trace's pois for the autonomy plan. */
   waterPoints: readonly WaterPoint[];
   slopeOn: boolean;
+  /** Avalanche-style terrain slope-angle overlay (the whole mountainside),
+   *  independent of `slopeOn` (which colours only the route line). */
+  terrainSlopeOn: boolean;
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
   selectedRange: { fromKm: number; toKm: number } | null;
   autonomyMode: AutonomyMode;
   selectedPoi: string | null;
   setSelectedPoi: (id: string | null) => void;
+  /** Latest geolocation fix from the "my location" button. A fresh object (one
+   *  per press) flies the map to it and drops the position marker. */
+  locateTarget: { lng: number; lat: number } | null;
 };
 
 // Runs `fn` once the map's sources/layers exist: immediately when the load
@@ -64,11 +80,13 @@ export function TopoMap({
   trace,
   waterPoints,
   slopeOn,
+  terrainSlopeOn,
   hoverKm,
   setHoverKm,
   selectedRange,
   selectedPoi,
   setSelectedPoi,
+  locateTarget,
 }: TopoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
@@ -150,6 +168,9 @@ export function TopoMap({
     map.on("load", () => {
       setupTerrain(map);
       addTraceLayers(map);
+      // After addTraceLayers so `route-casing` exists for the slope layer's
+      // beforeId — the shading then sits under every route/POI layer.
+      addTerrainSlopeLayer(map);
       addWaterLayers(map);
       registerWaterInteractions();
       readyRef.current = true;
@@ -311,6 +332,17 @@ export function TopoMap({
     });
   }, [slopeOn]);
 
+  // Terrain slope-angle overlay visibility — independent of `slopeOn`, so both
+  // the route-line colouring and the whole-mountainside shading can be on.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    runWhenMapReady(map, readyRef.current, () => {
+      if (!map.getLayer(TERRAIN_SLOPE_LAYER)) return;
+      map.setLayoutProperty(TERRAIN_SLOPE_LAYER, "visibility", terrainSlopeOn ? "visible" : "none");
+    });
+  }, [terrainSlopeOn]);
+
   // Selected-segment highlight.
   useEffect(() => {
     const map = mapRef.current;
@@ -364,6 +396,31 @@ export function TopoMap({
       source.setData(feature);
     });
   }, [hoverKm, trace]);
+
+  // Fly to the latest geolocation fix and drop the "you are here" marker. A new
+  // object identity (one per button press) re-runs this, so repeated presses
+  // re-centre even when the coordinates are unchanged. Zooms in only if the
+  // current view is wider than ~z13, so it never zooms a closer view back out.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !locateTarget) return;
+    runWhenMapReady(map, readyRef.current, () => {
+      const source = map.getSource("user-loc") as GeoJSONSource | undefined;
+      if (source) {
+        const feature: Feature<Point> = {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [locateTarget.lng, locateTarget.lat] },
+          properties: {},
+        };
+        source.setData(feature);
+      }
+      map.flyTo({
+        center: [locateTarget.lng, locateTarget.lat],
+        zoom: Math.max(map.getZoom(), 13),
+        speed: 1.2,
+      });
+    });
+  }, [locateTarget]);
 
   // POI selection state is reflected via class toggling on the marker DOM.
   useEffect(() => {

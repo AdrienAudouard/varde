@@ -47,6 +47,10 @@ export const ACCENT_DARK_INK = "#2a2317";
 export const TERMINUS_START = "#3f7a52";
 export const MARKER_STROKE = "#f7f1e5";
 
+// "You are here" dot — a GPS blue, deliberately outside the warm route/POI
+// palette so the user's live position reads as a distinct, recognisable marker.
+export const USER_LOC_COLOR = "#2f6df0";
+
 export const POI_COLOR: Record<PoiType, string> = {
   eau: "var(--poi-eau)",
   source: "var(--poi-eau)",
