@@ -61,6 +61,23 @@ const STYLE_URL =
   process.env.NEXT_PUBLIC_MAPTILER_STYLE_URL ??
   "https://api.maptiler.com/maps/landscape-v4/style.json?key=WXsPov0z1sCuQAGizPZ5";
 
+// 3D terrain relief. MapTiler serves elevation as a raster-DEM (terrain-rgb-v2);
+// we reuse the API key already present in the style URL rather than adding a
+// second env var. Realistic exaggeration keeps peak heights true to life so the
+// relief is usable for identifying actual summits, not just eye-candy.
+const TERRAIN_EXAGGERATION = 1.2;
+
+// Pulls the `?key=` out of the MapTiler style URL so the DEM source can share
+// it. Returns null for a self-hosted style with no key — terrain is then
+// skipped and the map still renders flat.
+function maptilerKeyFromStyleUrl(styleUrl: string): string | null {
+  try {
+    return new URL(styleUrl).searchParams.get("key");
+  } catch {
+    return null;
+  }
+}
+
 // Hardcoded color tokens — MapLibre's paint spec can't read CSS variables.
 // These mirror :root[data-theme="papier"] in globals.css. If the dark theme
 // (Nuit) is reintroduced, swap these via getComputedStyle on mount.
@@ -265,11 +282,33 @@ export function TopoMap({
       style: STYLE_URL,
       center: DEFAULT_VIEW.center,
       zoom: DEFAULT_VIEW.zoom,
+      // Allow a steep tilt (default cap is 60°) so Ctrl/right-click-drag can
+      // look across ridgelines and read the 3D relief, not just a shallow lean.
+      maxPitch: 80,
       attributionControl: { compact: true },
     });
     mapRef.current = map;
 
     map.on("load", () => {
+      // 3D terrain: drape every layer over a MapTiler elevation DEM so the
+      // route and POIs follow the ground and a Ctrl/right-click-drag tilt
+      // reveals real relief. Skipped when the style URL carries no key.
+      const maptilerKey = maptilerKeyFromStyleUrl(STYLE_URL);
+      if (maptilerKey) {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${maptilerKey}`,
+        });
+        map.setTerrain({ source: "terrain-dem", exaggeration: TERRAIN_EXAGGERATION });
+        map.setSky({
+          "sky-color": "#bcd4ec",
+          "horizon-color": "#e7eef6",
+          "fog-color": "#f7f1e5",
+          "sky-horizon-blend": 0.6,
+          "horizon-fog-blend": 0.5,
+        });
+      }
+
       // Trace-dependent sources are created unconditionally, seeded empty, in
       // insertion order route → slope → terminus → seg-hi → hover → osm-water
       // so the highlight/hover layers stay on top. The `[trace]` effect below
