@@ -32,7 +32,9 @@ import {
   TERRAIN_SLOPE_LAYER,
   addTerrainSlopeLayer,
   registerTerrainSlopeProtocol,
+  setTerrainSlopeRange,
 } from "@/components/varde/terrain-slope-protocol";
+import type { SlopeRange } from "@/lib/varde/terrain-slope";
 
 // Register the slope custom protocol once at module load (idempotent), before
 // any map mounts — the protocol must exist before the slope source requests a
@@ -48,9 +50,12 @@ type TopoMapProps = {
    *  into the trace's pois for the autonomy plan. */
   waterPoints: readonly WaterPoint[];
   slopeOn: boolean;
-  /** Avalanche-style terrain slope-angle overlay (the whole mountainside),
+  /** Avalanche-style terrain slope overlay (the whole mountainside),
    *  independent of `slopeOn` (which colours only the route line). */
   terrainSlopeOn: boolean;
+  /** Grade-% [min, max] window the terrain overlay renders (gradient across it,
+   *  transparent outside). Changing it re-renders the slope tiles. */
+  slopeRange: SlopeRange;
   hoverKm: number | null;
   setHoverKm: (km: number | null) => void;
   selectedRange: { fromKm: number; toKm: number } | null;
@@ -81,6 +86,7 @@ export function TopoMap({
   waterPoints,
   slopeOn,
   terrainSlopeOn,
+  slopeRange,
   hoverKm,
   setHoverKm,
   selectedRange,
@@ -141,6 +147,13 @@ export function TopoMap({
     });
     mapRef.current = map;
 
+    // Keep the canvas in sync with container-size changes — e.g. the top bar,
+    // profile and autonomy panels appearing when a trace loads (the map goes
+    // full-bleed when none is loaded). MapLibre's built-in trackResize only
+    // follows window resizes, not layout-driven container resizes.
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(container);
+
     // Water-point click/hover interactions, registered once after the layers
     // exist. Reads `waterPointsRef` to resolve a node's full details by id.
     const registerWaterInteractions = () => {
@@ -200,6 +213,7 @@ export function TopoMap({
     map.on("mouseout", () => setHoverKmRef.current(null));
 
     return () => {
+      resizeObserver.disconnect();
       markers.forEach(({ marker }) => marker.remove());
       markers.clear();
       map.remove();
@@ -332,8 +346,8 @@ export function TopoMap({
     });
   }, [slopeOn]);
 
-  // Terrain slope-angle overlay visibility — independent of `slopeOn`, so both
-  // the route-line colouring and the whole-mountainside shading can be on.
+  // Terrain slope overlay visibility — independent of `slopeOn`, so both the
+  // route-line colouring and the whole-mountainside shading can be on.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -342,6 +356,19 @@ export function TopoMap({
       map.setLayoutProperty(TERRAIN_SLOPE_LAYER, "visibility", terrainSlopeOn ? "visible" : "none");
     });
   }, [terrainSlopeOn]);
+
+  // Re-render the terrain overlay when the grade-% range changes. Debounced so
+  // dragging the control doesn't refetch/recompute every tile on each tick —
+  // only ~250ms after the last change. (A hidden layer loads no tiles, so this
+  // is cheap when the overlay is off.)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const timer = setTimeout(() => {
+      runWhenMapReady(map, readyRef.current, () => setTerrainSlopeRange(map, slopeRange));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [slopeRange]);
 
   // Selected-segment highlight.
   useEffect(() => {

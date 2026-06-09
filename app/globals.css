@@ -302,6 +302,27 @@ button {
   border: 1px solid var(--line);
   min-height: 0;
 }
+
+/* No trace loaded: the map is the whole view. Drop the column padding and the
+   map-stage's card framing so it fills edge to edge — just the map. */
+.plan-body.map-only .map-col {
+  padding: 0;
+  gap: 0;
+}
+.plan-body.map-only .map-stage {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* Floating "import GPX" entry point over the bare map — the top-bar and
+   side-panel import buttons are hidden while no trace is loaded. */
+.map-import-float {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 5;
+}
 .topomap {
   position: absolute;
   inset: 0;
@@ -661,11 +682,20 @@ button {
   letter-spacing: 0.05em;
   color: var(--ink-3);
 }
-.tsl-sw {
-  width: 16px;
-  height: 10px;
-  border-radius: 3px;
-  flex: none;
+/* Grade-% range control: the shadcn (Radix) Slider lives in a fixed-width box;
+   the component carries its own track/range/thumb styling. */
+.rng {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.rng-readout {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.rng-slider {
+  width: 150px;
 }
 .sl-row {
   display: flex;

@@ -11,7 +11,8 @@ import { PoiDetail } from "@/components/varde/poi-detail";
 import { ImportModal } from "@/components/varde/import-modal";
 import { buildSegments, type Trace } from "@/lib/varde/data";
 import { buildTerrain } from "@/lib/varde/terrain";
-import { SLOPE_BAND_LEGEND } from "@/lib/varde/terrain-slope";
+import { DEFAULT_SLOPE_RANGE, type SlopeRange } from "@/lib/varde/terrain-slope";
+import { SlopeRangeControl } from "@/components/varde/slope-range-control";
 import { waterPointsToPois } from "@/lib/varde/water-proximity";
 import { useRouteWaterPoints } from "@/components/varde/use-route-water-points";
 
@@ -26,6 +27,7 @@ const AUTONOMY_MODE: AutonomyMode = "panel";
 export default function Page() {
   const [slopeOn, setSlopeOn] = useState(false);
   const [terrainSlopeOn, setTerrainSlopeOn] = useState(false);
+  const [slopeRange, setSlopeRange] = useState<SlopeRange>(DEFAULT_SLOPE_RANGE);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const [locateTarget, setLocateTarget] = useState<{ lng: number; lat: number } | null>(null);
@@ -106,19 +108,33 @@ export default function Page() {
   return (
     <div className="app">
       <main className="main">
-        <TopBar
-          trace={trace}
-          segments={segments}
-          onImport={() => setImportOpen(true)}
-        />
-        <div className="plan-body">
+        {hasTrace && (
+          <TopBar
+            trace={trace}
+            segments={segments}
+            onImport={() => setImportOpen(true)}
+          />
+        )}
+        <div className={"plan-body" + (hasTrace ? "" : " map-only")}>
           <section className="map-col">
             <div className="map-stage">
+              {!hasTrace && (
+                <div className="map-import-float">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <Icon name="import" size={17} /> Importer un GPX
+                  </button>
+                </div>
+              )}
               <TopoMap
                 trace={mergedTrace}
                 waterPoints={waterPoints}
                 slopeOn={slopeOn}
                 terrainSlopeOn={terrainSlopeOn}
+                slopeRange={slopeRange}
                 locateTarget={locateTarget}
                 hoverKm={hoverKm}
                 setHoverKm={setHoverKm}
@@ -176,57 +192,53 @@ export default function Page() {
                   onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
                   title="Carte des pentes"
                 >
-                  <Icon name="layers" size={18} />
+                  <Icon name="mountain" size={18} />
                 </button>
               </div>
               <div className="map-legends">
                 {terrainSlopeOn && (
                   <div className="slope-legend terrain-slope-legend">
                     <span className="tsl-title">Pente du terrain</span>
-                    {SLOPE_BAND_LEGEND.map((band) => (
-                      <div className="sl-row" key={band.label}>
-                        <span className="tsl-sw" style={{ background: band.color }} />
-                        <span className="sl-lab">{band.label}</span>
+                    <SlopeRangeControl range={slopeRange} onChange={setSlopeRange} />
+                  </div>
+                )}
+                {hasTrace &&
+                  (slopeOn ? (
+                    <div className="slope-legend">
+                      <div className="sl-row">
+                        <span className="sl-lab">Montée</span>
+                        <span className="sl-bar up" />
+                        <span className="sl-mx mono">30%+</span>
                       </div>
-                    ))}
-                  </div>
-                )}
-                {slopeOn ? (
-                  <div className="slope-legend">
-                    <div className="sl-row">
-                      <span className="sl-lab">Montée</span>
-                      <span className="sl-bar up" />
-                      <span className="sl-mx mono">30%+</span>
+                      <div className="sl-row">
+                        <span className="sl-lab">Descente</span>
+                        <span className="sl-bar down" />
+                        <span className="sl-mx mono">30%+</span>
+                      </div>
                     </div>
-                    <div className="sl-row">
-                      <span className="sl-lab">Descente</span>
-                      <span className="sl-bar down" />
-                      <span className="sl-mx mono">30%+</span>
+                  ) : (
+                    <div className="map-legend">
+                      <span>
+                        <i className="lg eau" /> Eau
+                        {waterLoading && (
+                          <span
+                            className="varde-spinner"
+                            role="status"
+                            aria-label="Chargement des points d'eau"
+                          />
+                        )}
+                      </span>
+                      <span>
+                        <i className="lg ravito" /> Ravito
+                      </span>
+                      <span>
+                        <i className="lg refuge" /> Refuge
+                      </span>
+                      <span>
+                        <i className="lg dash" /> À vérifier
+                      </span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="map-legend">
-                    <span>
-                      <i className="lg eau" /> Eau
-                      {waterLoading && (
-                        <span
-                          className="varde-spinner"
-                          role="status"
-                          aria-label="Chargement des points d'eau"
-                        />
-                      )}
-                    </span>
-                    <span>
-                      <i className="lg ravito" /> Ravito
-                    </span>
-                    <span>
-                      <i className="lg refuge" /> Refuge
-                    </span>
-                    <span>
-                      <i className="lg dash" /> À vérifier
-                    </span>
-                  </div>
-                )}
+                  ))}
               </div>
               {selectedPoiData && (
                 <PoiDetail
@@ -236,30 +248,32 @@ export default function Page() {
                 />
               )}
             </div>
-            <div className="profile-panel">
-              <div className="pp-head">
-                <span className="pp-title">Profil altimétrique</span>
-                <span className="pp-hint mono">
-                  {hoverKm != null
-                    ? `${hoverKm.toFixed(1).replace(".", ",")} km`
-                    : "survole pour explorer"}
-                </span>
+            {hasTrace && (
+              <div className="profile-panel">
+                <div className="pp-head">
+                  <span className="pp-title">Profil altimétrique</span>
+                  <span className="pp-hint mono">
+                    {hoverKm != null
+                      ? `${hoverKm.toFixed(1).replace(".", ",")} km`
+                      : "survole pour explorer"}
+                  </span>
+                </div>
+                <ElevationProfile
+                  route={route}
+                  pois={pois}
+                  bands={bands}
+                  hoverKm={hoverKm}
+                  setHoverKm={setHoverKm}
+                  slopeOn={slopeOn}
+                  selected={selected}
+                  setSelected={setSelected}
+                  autonomyMode={AUTONOMY_MODE}
+                />
               </div>
-              <ElevationProfile
-                route={route}
-                pois={pois}
-                bands={bands}
-                hoverKm={hoverKm}
-                setHoverKm={setHoverKm}
-                slopeOn={slopeOn}
-                selected={selected}
-                setSelected={setSelected}
-                autonomyMode={AUTONOMY_MODE}
-              />
-            </div>
+            )}
           </section>
 
-          {hasTrace ? (
+          {hasTrace && (
             <AutonomyPanels
               segments={segments}
               terrain={terrain}
@@ -269,26 +283,6 @@ export default function Page() {
               activeTab={activeTab}
               setActiveTab={setActiveTab}
             />
-          ) : (
-            <aside className="autonomy">
-              <div className="empty-state">
-                <div className="empty-state-ic">
-                  <Icon name="route" size={28} />
-                </div>
-                <h2 className="empty-state-title">Aucune trace chargée</h2>
-                <p className="empty-state-text">
-                  Importe un fichier GPX pour visualiser le profil, les points d&apos;eau et le
-                  plan d&apos;autonomie.
-                </p>
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={() => setImportOpen(true)}
-                >
-                  <Icon name="import" size={17} /> Importer un GPX
-                </button>
-              </div>
-            </aside>
           )}
         </div>
       </main>

@@ -19,6 +19,7 @@ export type IconName =
   | "house"
   | "fork"
   | "locate"
+  | "mountain"
   | "grad";
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -126,6 +127,11 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="12" cy="12" r="7" />
       <circle cx="12" cy="12" r="2" />
       <path d="M12 1.5v3.5M12 19v3.5M1.5 12h3.5M19 12h3.5" />
+    </g>
+  ),
+  mountain: (
+    <g>
+      <path d="M3 20l5-10 3 5 4-8 6 13z" />
     </g>
   ),
 };
