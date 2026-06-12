@@ -36,6 +36,7 @@ export default function Page() {
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
 
   const [trace, setTrace] = useState<Trace | null>(null);
 
@@ -154,46 +155,60 @@ export default function Page() {
                 </div>
               )}
               <div className="map-ctrls">
-                <button type="button" className="mc-btn">
-                  +
-                </button>
-                <button type="button" className="mc-btn">
-                  −
-                </button>
                 <button
                   type="button"
-                  className="mc-btn"
-                  onClick={handleLocate}
-                  disabled={locating}
-                  title="Ma position"
-                  aria-label="Centrer sur ma position"
+                  className={"mc-btn" + (controlsOpen ? " on" : "")}
+                  onClick={() => setControlsOpen((open) => !open)}
+                  title="Options de la carte"
+                  aria-label="Options de la carte"
+                  aria-expanded={controlsOpen}
                 >
-                  {locating ? (
-                    <span
-                      className="varde-spinner"
-                      role="status"
-                      aria-label="Localisation en cours"
-                    />
-                  ) : (
-                    <Icon name="locate" size={18} />
-                  )}
+                  <Icon name="settings" size={18} />
                 </button>
-                <button
-                  type="button"
-                  className={"mc-btn" + (slopeOn ? " on" : "")}
-                  onClick={() => setSlopeOn(!slopeOn)}
-                  title="Calque pente"
-                >
-                  <Icon name="grad" size={18} />
-                </button>
-                <button
-                  type="button"
-                  className={"mc-btn" + (terrainSlopeOn ? " on" : "")}
-                  onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
-                  title="Carte des pentes"
-                >
-                  <Icon name="mountain" size={18} />
-                </button>
+                {controlsOpen && (
+                  <>
+                    <button type="button" className="mc-btn">
+                      +
+                    </button>
+                    <button type="button" className="mc-btn">
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      className="mc-btn"
+                      onClick={handleLocate}
+                      disabled={locating}
+                      title="Ma position"
+                      aria-label="Centrer sur ma position"
+                    >
+                      {locating ? (
+                        <span
+                          className="varde-spinner"
+                          role="status"
+                          aria-label="Localisation en cours"
+                        />
+                      ) : (
+                        <Icon name="locate" size={18} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={"mc-btn" + (slopeOn ? " on" : "")}
+                      onClick={() => setSlopeOn(!slopeOn)}
+                      title="Calque pente"
+                    >
+                      <Icon name="grad" size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      className={"mc-btn" + (terrainSlopeOn ? " on" : "")}
+                      onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
+                      title="Carte des pentes"
+                    >
+                      <Icon name="mountain" size={18} />
+                    </button>
+                  </>
+                )}
               </div>
               <div className="map-legends">
                 {terrainSlopeOn && (

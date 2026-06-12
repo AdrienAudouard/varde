@@ -10,7 +10,7 @@ This project uses **Next.js 16.2.7** with **React 19.2.4**. APIs, conventions, a
 
 ## Commands
 
-- `npm run dev` — start the dev server (http://localhost:3000)
+- `npm run dev` — start the dev server (http://localhost:3001)
 - `npm run build` — production build
 - `npm run start` — run the production build
 - `npm run lint` — run ESLint (`eslint-config-next` core-web-vitals + typescript)
