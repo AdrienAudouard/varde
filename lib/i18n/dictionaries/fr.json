@@ -1,0 +1,195 @@
+{
+  "meta": {
+    "title": "Varde — Planifier son autonomie en trail et en montagne",
+    "description": "Varde transforme n'importe quel GPX en plan d'autonomie. Chaque point d'eau, ravito et refuge cartographié entre les segments — avec le dénivelé, le timing et les litres à porter déjà calculés."
+  },
+  "nav": {
+    "features": "Fonctionnalités",
+    "how": "Comment ça marche",
+    "uses": "Cas d'usage",
+    "launch": "Ouvrir l'app"
+  },
+  "hero": {
+    "eyebrow": "Planificateur d'autonomie · trail & montagne",
+    "headline": "Sache exactement où tu vas ",
+    "headlineEm": "tomber à sec.",
+    "lead": "Varde transforme n'importe quel GPX en plan d'autonomie. Chaque point d'eau, ravito et refuge cartographié entre les segments — avec le dénivelé, le timing et les litres à porter déjà calculés.",
+    "feats": {
+      "water": "Eau & ravito",
+      "timing": "Timing selon le dénivelé",
+      "gpx": "GPX en entrée, plan en sortie"
+    },
+    "launch": "Ouvrir l'app",
+    "mapChipTag": "En préparation",
+    "mapChipName": "Tour des Crêtes",
+    "legend": {
+      "water": "Eau",
+      "refuel": "Ravito",
+      "refuge": "Refuge"
+    },
+    "floatSeg": {
+      "from": "Refuge des Crêtes",
+      "to": "→ Ruisseau de la combe",
+      "time": "13h16",
+      "km": "km",
+      "up": "D+",
+      "down": "D−",
+      "liters": "1.1 L"
+    }
+  },
+  "features": {
+    "eyebrow": "Ce que fait Varde",
+    "title": "Une planification qui voit plus loin que le tracé.",
+    "lead": "Une trace te dit où aller. Varde te dit ce qu'il faut pour y arriver en autonomie — segment par segment, entre chaque endroit où refaire le plein.",
+    "primary": {
+      "num": "01",
+      "eyebrow": "Plan d'autonomie",
+      "title": "Ni trop, ni trop peu à porter.",
+      "body": "Varde découpe ta trace à chaque point d'eau et calcule ce dont tu as vraiment besoin entre eux — distance, dénivelé, temps estimé et litres à porter. La plus longue section sans eau est signalée pour ne jamais te faire surprendre en altitude.",
+      "items": [
+        {
+          "icon": "water",
+          "bold": "Eau entre les points",
+          "sub": "— une estimation des besoins par segment, cumulée sur la journée."
+        },
+        {
+          "icon": "clock",
+          "bold": "Heures de passage",
+          "sub": "— une allure ajustée au dénivelé t'indique quand tu atteindras chaque arrêt."
+        },
+        {
+          "icon": "warn",
+          "bold": "Sources incertaines signalées",
+          "sub": "— une source à sec l'été est marquée « à vérifier », jamais comptée d'avance."
+        }
+      ]
+    },
+    "preview": {
+      "headTitle": "Plan d'autonomie",
+      "headSub": "Entre chaque point d'eau : ce qu'il faut prévoir.",
+      "summary": {
+        "segments": "Segments",
+        "longestDry": "Plus longue à sec",
+        "carryMax": "À porter (max)"
+      },
+      "segments": [
+        {
+          "color": "ravito",
+          "from": "Épicerie de Vallon",
+          "to": "→ Source du Col",
+          "time": "10h23",
+          "km": "3.7",
+          "up": "+1",
+          "down": "−431",
+          "filledCells": 2,
+          "liters": "0.5 L"
+        },
+        {
+          "color": "refuge",
+          "from": "Refuge des Crêtes",
+          "to": "→ Ruisseau de la combe",
+          "time": "13h16",
+          "km": "5.6",
+          "up": "+505",
+          "down": "−272",
+          "filledCells": 5,
+          "liters": "1.1 L"
+        }
+      ],
+      "units": {
+        "km": "km",
+        "up": "D+",
+        "down": "D−"
+      }
+    },
+    "topo": {
+      "num": "02",
+      "eyebrow": "Carte topographique",
+      "title": "Une carte qui se lit comme le terrain.",
+      "body": "Courbes de niveau, forêts et eau rendues dans des tons cartographiques sobres. Active le calque de pente et la trace se colore selon le gradient — tu vois le raide avant de le sentir.",
+      "legend": {
+        "climb": "Montée",
+        "descent": "Descente"
+      }
+    },
+    "profile": {
+      "num": "03",
+      "eyebrow": "Profil altimétrique",
+      "title": "Chaque mètre de dénivelé, en contexte.",
+      "body": "Le profil est synchronisé avec la carte et le plan. Les points d'eau se placent exactement là où tu les croiseras, pour lire distance, dénivelé et ravitaillement d'un seul coup d'œil."
+    }
+  },
+  "how": {
+    "eyebrow": "Comment ça marche",
+    "title": "D'une trace brute à un plan de course.",
+    "lead": "Trois étapes. Pas de tableur, pas d'approximation sur la ligne de départ.",
+    "steps": [
+      {
+        "num": "01",
+        "icon": "import",
+        "title": "Importe ton GPX",
+        "body": "Dépose une trace depuis ta montre, un créateur d'itinéraire ou la reco d'un ami. Varde lit le tracé et le dénivelé en quelques secondes.",
+        "meta": ".gpx · .fit · .tcx"
+      },
+      {
+        "num": "02",
+        "icon": "water",
+        "title": "Repère ton eau",
+        "body": "Place fontaines, ravitos et refuges le long du parcours — ou récupère des points connus. Varde découpe la journée et calcule chaque section d'autonomie.",
+        "meta": "Découpage auto"
+      },
+      {
+        "num": "03",
+        "icon": "export",
+        "title": "Exporte et emporte-le",
+        "body": "Emporte un tableau de course clair — passages, dénivelé, eau par segment — sur ton téléphone ou imprime-le pour l'équipe. Tout le monde connaît le plan.",
+        "meta": "Tableau · impression · partage"
+      }
+    ]
+  },
+  "uses": {
+    "eyebrow": "Pour qui",
+    "title": "Que tu la coures ou que tu la randonnes.",
+    "lead": "La même logique d'autonomie, ajustée à la distance et à l'allure.",
+    "cards": [
+      {
+        "tag": "Ultra & course",
+        "title": "Maîtrise les calculs entre ravitos.",
+        "body": "Planifie exactement ce qu'il faut porter entre les ravitaillements, construis un planning d'allure avec barrières horaires, et donne à l'équipe un tableau de passages lisible à 3 h du matin.",
+        "foot": [
+          { "value": "50+", "label": "km" },
+          { "value": "8", "label": "segments" }
+        ]
+      },
+      {
+        "tag": "Rando & marche",
+        "title": "Reste autonome sur le sentier.",
+        "body": "Cartographie fontaines, refuges et ruisseaux fiables sur une journée de plusieurs heures. Connais la plus longue section sans eau avant de quitter la voiture, pas à mi-montée.",
+        "foot": [
+          { "value": "7.1", "label": "km à sec" },
+          { "value": "5.1", "label": "L jour" }
+        ]
+      },
+      {
+        "tag": "Reco & entraînement",
+        "title": "Repère une ligne avant de t'engager.",
+        "body": "Teste le dénivelé et le timing d'un parcours, vérifie où l'eau coule vraiment en saison, et marque les sources à confirmer lors de ta prochaine reconnaissance.",
+        "foot": [
+          { "value": "+1585", "label": "D+" },
+          { "value": "8h28", "label": "est." }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "tagline": "Un planificateur d'autonomie pour traileurs et randonneurs. Cartographie l'eau, le dénivelé et le temps — puis pars léger, et pars loin.",
+    "productHead": "Produit",
+    "links": {
+      "features": "Fonctionnalités",
+      "how": "Comment ça marche",
+      "uses": "Cas d'usage"
+    },
+    "copyright": "© 2026 Varde",
+    "madeIn": "Conçu dans les Alpes · 45.9°N 6.9°E"
+  }
+}

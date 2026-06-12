@@ -1,0 +1,195 @@
+{
+  "meta": {
+    "title": "Varde — Autonomy planning for trail & mountain",
+    "description": "Varde turns any GPX into an autonomy plan. Every water point, refuel and refuge mapped between segments — with the climb, the timing, and the liters to carry already worked out."
+  },
+  "nav": {
+    "features": "Features",
+    "how": "How it works",
+    "uses": "Use cases",
+    "launch": "Launch app"
+  },
+  "hero": {
+    "eyebrow": "Autonomy planner · trail & mountain",
+    "headline": "Know exactly where you'll ",
+    "headlineEm": "run dry.",
+    "lead": "Varde turns any GPX into an autonomy plan. Every water point, refuel and refuge mapped between segments — with the climb, the timing, and the liters to carry already worked out.",
+    "feats": {
+      "water": "Water & refuel",
+      "timing": "Climb-aware timing",
+      "gpx": "GPX in, plan out"
+    },
+    "launch": "Launch app",
+    "mapChipTag": "In preparation",
+    "mapChipName": "Tour des Crêtes",
+    "legend": {
+      "water": "Water",
+      "refuel": "Refuel",
+      "refuge": "Refuge"
+    },
+    "floatSeg": {
+      "from": "Refuge des Crêtes",
+      "to": "→ Ruisseau de la combe",
+      "time": "13h16",
+      "km": "km",
+      "up": "D+",
+      "down": "D−",
+      "liters": "1.1 L"
+    }
+  },
+  "features": {
+    "eyebrow": "What Varde does",
+    "title": "Planning that thinks past the route line.",
+    "lead": "A drawn track tells you where to go. Varde tells you what it takes to get there self-sufficient — segment by segment, between every place you can refill.",
+    "primary": {
+      "num": "01",
+      "eyebrow": "Autonomy plan",
+      "title": "Never carry too much, or too little.",
+      "body": "Varde splits your route at each water point and works out what you actually need between them — distance, vertical, estimated time, and the liters to carry. The longest dry stretch is flagged so nothing catches you out at altitude.",
+      "items": [
+        {
+          "icon": "water",
+          "bold": "Water between points",
+          "sub": "— a need estimate per segment, summed for the day."
+        },
+        {
+          "icon": "clock",
+          "bold": "Arrival times",
+          "sub": "— climb-adjusted pacing tells you when you'll reach each stop."
+        },
+        {
+          "icon": "warn",
+          "bold": "Unreliable sources flagged",
+          "sub": "— a summer-dry spring is marked \"verify\", not counted on."
+        }
+      ]
+    },
+    "preview": {
+      "headTitle": "Autonomy plan",
+      "headSub": "Between each water point: what to plan for.",
+      "summary": {
+        "segments": "Segments",
+        "longestDry": "Longest dry",
+        "carryMax": "Carry (max)"
+      },
+      "segments": [
+        {
+          "color": "ravito",
+          "from": "Épicerie de Vallon",
+          "to": "→ Source du Col",
+          "time": "10h23",
+          "km": "3.7",
+          "up": "+1",
+          "down": "−431",
+          "filledCells": 2,
+          "liters": "0.5 L"
+        },
+        {
+          "color": "refuge",
+          "from": "Refuge des Crêtes",
+          "to": "→ Ruisseau de la combe",
+          "time": "13h16",
+          "km": "5.6",
+          "up": "+505",
+          "down": "−272",
+          "filledCells": 5,
+          "liters": "1.1 L"
+        }
+      ],
+      "units": {
+        "km": "km",
+        "up": "D+",
+        "down": "D−"
+      }
+    },
+    "topo": {
+      "num": "02",
+      "eyebrow": "Topographic map",
+      "title": "A map that reads like terrain.",
+      "body": "Contour lines, forests and water rendered in calm cartographic tones. Flip on the slope layer and the track is colored by gradient — you see the steep before you feel it.",
+      "legend": {
+        "climb": "Climb",
+        "descent": "Descent"
+      }
+    },
+    "profile": {
+      "num": "03",
+      "eyebrow": "Elevation profile",
+      "title": "Every meter of climb, in context.",
+      "body": "The profile is synced to the map and the plan. Water points sit exactly where you'll meet them, so you read distance, vertical and refill in a single glance."
+    }
+  },
+  "how": {
+    "eyebrow": "How it works",
+    "title": "From a raw track to a race-day plan.",
+    "lead": "Three steps. No spreadsheets, no guesswork on the start line.",
+    "steps": [
+      {
+        "num": "01",
+        "icon": "import",
+        "title": "Import your GPX",
+        "body": "Drop in a track from your watch, a route builder, or a friend's recon. Varde reads the line and the elevation in seconds.",
+        "meta": ".gpx · .fit · .tcx"
+      },
+      {
+        "num": "02",
+        "icon": "water",
+        "title": "Mark your water",
+        "body": "Place fountains, refuels and refuges along the route — or pull from known points. Varde segments the day and computes each autonomy stretch.",
+        "meta": "Auto-segmented"
+      },
+      {
+        "num": "03",
+        "icon": "export",
+        "title": "Export & carry it",
+        "body": "Take a clean course table — passages, vertical, water per segment — to your phone or print it for the crew. Everyone knows the plan.",
+        "meta": "Table · print · share"
+      }
+    ]
+  },
+  "uses": {
+    "eyebrow": "Who it's for",
+    "title": "Whether you race it or wander it.",
+    "lead": "The same autonomy thinking, tuned to how far you're going and how fast.",
+    "cards": [
+      {
+        "tag": "Ultra & race",
+        "title": "Nail the aid-station math.",
+        "body": "Plan exactly what to carry between aid stations, build a pacing schedule with cut-offs, and hand the crew a passage table they can read at 3 a.m.",
+        "foot": [
+          { "value": "50+", "label": "km" },
+          { "value": "8", "label": "segments" }
+        ]
+      },
+      {
+        "tag": "Hike & rando",
+        "title": "Stay self-sufficient on the trail.",
+        "body": "Map fountains, refuges and reliable streams across a multi-hour day. Know the longest dry stretch before you leave the car, not halfway up.",
+        "foot": [
+          { "value": "7.1", "label": "km dry" },
+          { "value": "5.1", "label": "L day" }
+        ]
+      },
+      {
+        "tag": "Recon & training",
+        "title": "Scout a line before you commit.",
+        "body": "Test a route's vertical and timing, check where water actually runs in season, and flag the springs to verify on your next reconnaissance.",
+        "foot": [
+          { "value": "+1585", "label": "D+" },
+          { "value": "8h28", "label": "est." }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "tagline": "An autonomy planner for trail runners and hikers. Map the water, the climb and the time — then go light, and go far.",
+    "productHead": "Product",
+    "links": {
+      "features": "Features",
+      "how": "How it works",
+      "uses": "Use cases"
+    },
+    "copyright": "© 2026 Varde",
+    "madeIn": "Made in the Alps · 45.9°N 6.9°E"
+  }
+}

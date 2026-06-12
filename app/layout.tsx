@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import { Hanken_Grotesk, IBM_Plex_Mono, Archivo } from "next/font/google";
 import "./globals.css";
+import { getLocale } from "@/lib/i18n/get-locale";
 
 const hankenGrotesk = Hanken_Grotesk({
   variable: "--font-sans",
@@ -14,24 +15,32 @@ const ibmPlexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
 });
 
+const archivo = Archivo({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800", "900"],
+});
+
 export const metadata: Metadata = {
-  title: "Varde — Planification",
-  description: "Planifie tes traces de trail : carte topo, profil et plan d'autonomie.",
+  title: "Varde",
+  description:
+    "Planificateur d'autonomie pour le trail et la montagne : carte topo, profil altimétrique et plan d'eau par segment.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
     <html
-      lang="fr"
+      lang={locale}
       data-theme="papier"
       data-contours="on"
-      className={`${hankenGrotesk.variable} ${ibmPlexMono.variable} h-full`}
+      className={`${hankenGrotesk.variable} ${ibmPlexMono.variable} ${archivo.variable} h-full`}
     >
-      <body className="h-full overflow-hidden bg-paper text-ink antialiased">{children}</body>
+      <body className="bg-paper text-ink antialiased">{children}</body>
     </html>
   );
 }
