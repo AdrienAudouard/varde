@@ -144,8 +144,8 @@ export function addTraceLayers(map: MaplibreMap): void {
   });
 }
 
-// OSM water points layer (populated by the Overpass fetch effect). Added last so
-// it sits above the route and hover layers.
+// OSM water points layer (populated by the water-points fetch effect). Added
+// last so it sits above the route and hover layers.
 export function addWaterLayers(map: MaplibreMap): void {
   map.addSource("osm-water", { type: "geojson", data: EMPTY_FC });
   map.addLayer({

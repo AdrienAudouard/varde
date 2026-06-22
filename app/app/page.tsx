@@ -42,7 +42,7 @@ export default function Page() {
 
   const route = useMemo(() => trace?.route ?? [], [trace]);
 
-  // Single Overpass fetch for the whole route; projected onto the path and
+  // Single water-point fetch for the whole route; projected onto the path and
   // merged into the trace so the pure `buildSegments` picks the water points up.
   const { waterPoints, isLoading: waterLoading, error: waterError } = useRouteWaterPoints(route);
   const derivedPois = useMemo(
@@ -146,7 +146,7 @@ export default function Page() {
               />
               {waterError && (
                 <div className="varde-water-error" role="status">
-                  Overpass API : {waterError}
+                  Points d&apos;eau : {waterError}
                 </div>
               )}
               {locateError && (

@@ -15,7 +15,7 @@ import maplibregl, {
 import type { Feature, LineString, Point } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { pointAtKm, type Trace } from "@/lib/varde/data";
-import { type WaterPoint, type WaterPointKind } from "@/lib/varde/overpass";
+import { type WaterPoint, type WaterPointKind } from "@/lib/varde/water-points";
 import { buildSlopeFeatures, routeCoords } from "@/lib/varde/topo-features";
 import {
   DEFAULT_VIEW,
@@ -98,9 +98,9 @@ export function TopoMap({
   const mapRef = useRef<MaplibreMap | null>(null);
   const readyRef = useRef(false);
   const markersRef = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
-  // OSM water points fetched from Overpass — keyed by OSM node id so the click
+  // OSM water points fetched from the API — keyed by OSM node id so the click
   // popup can look up full details from the feature's `id` property without
-  // round-tripping the (potentially large) tag dict through GeoJSON properties.
+  // round-tripping every field through GeoJSON properties.
   const waterPointsRef = useRef<Map<number, WaterPoint>>(new Map());
 
   // Latest-callback refs so the map's load/mousemove handlers (registered once)
@@ -308,7 +308,7 @@ export function TopoMap({
   }, [route]);
 
   // Rebuild POI markers when the trace's pois change (including the water points
-  // the page derives from the async Overpass fetch). Reads the route from
+  // the page derives from the async water-point fetch). Reads the route from
   // `traceRef` so it isn't keyed on geometry — only re-runs when pois change.
   const pois = trace?.pois;
   useEffect(() => {

@@ -6,7 +6,8 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "eslint"
+    "lint": "eslint",
+    "transform:pois": "node scripts/transform-pois.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -15,6 +16,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
     "maplibre-gl": "^5.24.0",
+    "mongodb": "^7.3.0",
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",

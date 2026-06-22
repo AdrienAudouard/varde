@@ -4,7 +4,7 @@
 // bodies, so importing this module is SSR-safe.
 
 import { type Poi, type PoiType } from "@/lib/varde/data";
-import { KIND_LABEL, type WaterPoint } from "@/lib/varde/overpass";
+import { KIND_LABEL, type WaterPoint } from "@/lib/varde/water-points";
 import { POI_COLOR } from "@/components/varde/topo-map-style";
 
 function poiGlyphSvg(type: PoiType): string {

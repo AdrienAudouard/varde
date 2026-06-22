@@ -7,7 +7,7 @@
 
 import type { Poi, RoutePoint } from "@/lib/varde/data";
 import { projectPointOnSegment } from "@/lib/varde/geo";
-import { KIND_LABEL, type WaterPoint } from "@/lib/varde/overpass";
+import { KIND_LABEL, WaterPointKind, type WaterPoint } from "@/lib/varde/water-points";
 
 // How close (metres) a water point must be to the path to make the plan.
 const DEFAULT_THRESHOLD_M = 150;
@@ -23,7 +23,7 @@ function buildNote(wp: WaterPoint): string {
   if (wp.operator) parts.push(`Opéré par ${wp.operator}`);
   if (wp.openingHours) parts.push(`Horaires : ${wp.openingHours}`);
   if (parts.length > 0) return parts.join(" · ");
-  return wp.kind === "spring"
+  return wp.kind === WaterPointKind.Spring
     ? "Source naturelle — fiabilité à vérifier."
     : "Point d'eau OpenStreetMap.";
 }
@@ -31,11 +31,11 @@ function buildNote(wp: WaterPoint): string {
 function toPoi(wp: WaterPoint, km: number, offsetM: number): Poi {
   return {
     id: `osm-${wp.id}`,
-    type: wp.kind === "spring" ? "source" : "eau",
+    type: wp.kind === WaterPointKind.Spring ? "source" : "eau",
     name: wp.name ?? KIND_LABEL[wp.kind],
     km,
     offset: offsetM,
-    fiable: wp.kind !== "spring" && wp.drinkable !== false,
+    fiable: wp.kind !== WaterPointKind.Spring && wp.drinkable !== false,
     note: buildNote(wp),
   };
 }

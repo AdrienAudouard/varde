@@ -3,7 +3,7 @@
 // km unless a name says otherwise.
 
 import type { RoutePoint } from "@/lib/varde/data";
-import type { Bbox } from "@/lib/varde/overpass";
+import type { Bbox } from "@/lib/varde/water-points";
 
 const EARTH_KM = 6371;
 const TO_RAD = Math.PI / 180;
