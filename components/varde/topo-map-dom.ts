@@ -58,14 +58,6 @@ export function buildOsmPopupContent(wp: WaterPoint): HTMLElement {
     root.appendChild(list);
   }
 
-  const link = document.createElement("a");
-  link.className = "osm-water-popup-link";
-  link.href = `https://www.openstreetmap.org/node/${wp.id}`;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  link.textContent = "Voir sur OpenStreetMap →";
-  root.appendChild(link);
-
   return root;
 }
 

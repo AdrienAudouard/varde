@@ -14,6 +14,7 @@ import {
   TERMINUS_START,
   TERRAIN_EXAGGERATION,
   USER_LOC_COLOR,
+  WATER_MIN_ZOOM,
   maptilerKeyFromStyleUrl,
   osmWaterColorExpr,
 } from "@/components/varde/topo-map-style";
@@ -152,7 +153,7 @@ export function addWaterLayers(map: MaplibreMap): void {
     id: "osm-water-halo",
     type: "circle",
     source: "osm-water",
-    minzoom: 9,
+    minzoom: WATER_MIN_ZOOM,
     paint: {
       "circle-radius": 9,
       "circle-color": osmWaterColorExpr(),
@@ -163,7 +164,7 @@ export function addWaterLayers(map: MaplibreMap): void {
     id: "osm-water-dot",
     type: "circle",
     source: "osm-water",
-    minzoom: 9,
+    minzoom: WATER_MIN_ZOOM,
     paint: {
       "circle-radius": 4.5,
       "circle-color": osmWaterColorExpr(),

@@ -37,25 +37,26 @@ enum WaterSubtype {
   HotSpring = "hot_spring",
 }
 
-// Mirrors the old Overpass classify(), reading the curated `subtype`. For the
-// current dataset every water doc is `drinking_water`; the other cases keep the
-// resolver ready for future, non-pre-filtered exports.
-function classifyKind(subtype: string): WaterPointKind {
-  switch (subtype) {
-    case WaterSubtype.DrinkingWater:
-    case WaterSubtype.DrinkingFountain:
-      return WaterPointKind.DrinkingWater;
-    case WaterSubtype.WaterPoint:
-      return WaterPointKind.WaterPoint;
-    case WaterSubtype.WaterTap:
-    case WaterSubtype.Tap:
-      return WaterPointKind.Tap;
-    case WaterSubtype.Spring:
-    case WaterSubtype.HotSpring:
-      return WaterPointKind.Spring;
-    default:
-      return WaterPointKind.Other;
+// Classify a water doc into a WaterPointKind. Every doc in this dataset carries
+// amenity=drinking_water as its `subtype`; the secondary OSM descriptors the
+// transform preserved (natural / man_made / fountain) are what actually
+// distinguish the kinds. Precedence: spring (reliability-relevant) > tap >
+// fountain > the generic drinking_water. Match values come from WaterSubtype,
+// not bare literals.
+function classifyKind(doc: PointOfInterestDoc): WaterPointKind {
+  if (doc.natural === WaterSubtype.Spring || doc.natural === WaterSubtype.HotSpring) {
+    return WaterPointKind.Spring;
   }
+  if (doc.manMade === WaterSubtype.WaterTap || doc.manMade === WaterSubtype.Tap) {
+    return WaterPointKind.Tap;
+  }
+  if (doc.fountain !== undefined || doc.manMade === WaterSubtype.DrinkingFountain) {
+    return WaterPointKind.Fountain;
+  }
+  if (doc.subtype === WaterSubtype.WaterPoint) {
+    return WaterPointKind.WaterPoint;
+  }
+  return WaterPointKind.DrinkingWater;
 }
 
 function boolTag(v: string | undefined): boolean | undefined {
@@ -68,7 +69,7 @@ function toWaterPoint(doc: PointOfInterestDoc): WaterPoint {
   const [lng, lat] = doc.location.coordinates;
   return {
     id: Number(doc._id.split("/")[1]), // "node/27122976" -> 27122976
-    kind: classifyKind(doc.subtype),
+    kind: classifyKind(doc),
     lng,
     lat,
     name: doc.name,
@@ -100,6 +101,15 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ error: "bbox out of range or inverted" }, { status: 400 });
   }
 
+  // Which POI categories to return. Absent → "water" (back-compat for the plan's
+  // route fetch). Empty after parsing → nothing selected, return [].
+  const catParam = searchParams.get("categories");
+  const categories =
+    catParam === null
+      ? ["water"]
+      : catParam.split(",").map((c) => c.trim()).filter(Boolean);
+  if (categories.length === 0) return Response.json([]);
+
   // GeoJSON Polygon ring (CCW exterior) from the bbox corners, closed.
   const ring: number[][] = [
     [west, south],
@@ -113,7 +123,7 @@ export async function GET(request: Request): Promise<Response> {
     const collection = await getPoiCollection();
     const docs = await collection
       .find({
-        category: "water",
+        category: { $in: categories },
         location: { $geoWithin: { $geometry: { type: "Polygon", coordinates: [ring] } } },
       })
       .limit(MAX_RESULTS + 1)

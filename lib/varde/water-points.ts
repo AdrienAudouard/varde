@@ -9,9 +9,20 @@ export enum WaterPointKind {
   DrinkingWater = "drinking_water",
   WaterPoint = "water_point",
   Tap = "tap",
+  Fountain = "fountain",
   Spring = "spring",
   Other = "other",
 }
+
+// The water sub-kinds offered in the map filter, in display order. WaterPoint /
+// Other are reachable by the classifier but don't occur in the current dataset,
+// so they're omitted from the filter UI.
+export const WATER_FILTER_KINDS: readonly WaterPointKind[] = [
+  WaterPointKind.DrinkingWater,
+  WaterPointKind.Spring,
+  WaterPointKind.Tap,
+  WaterPointKind.Fountain,
+];
 
 export type WaterPoint = {
   /** OSM node id — stable across requests, used as React/feature key. */
@@ -38,6 +49,7 @@ export type Bbox = readonly [number, number, number, number];
  */
 export async function fetchWaterPoints(
   bbox: Bbox,
+  categories: readonly string[],
   signal?: AbortSignal,
 ): Promise<WaterPoint[]> {
   const [west, south, east, north] = bbox;
@@ -46,9 +58,11 @@ export async function fetchWaterPoints(
     s: String(south),
     e: String(east),
     n: String(north),
+    categories: categories.join(","),
   });
   const res = await fetch(`/api/water-points?${qs.toString()}`, { signal });
-  if (!res.ok) throw new Error(`Points d'eau : HTTP ${res.status}`);
+  // Bare message — the page's overlay already prefixes "Points d'eau : ".
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as WaterPoint[];
 }
 
@@ -56,6 +70,7 @@ export const KIND_LABEL: Record<WaterPointKind, string> = {
   [WaterPointKind.DrinkingWater]: "Point d'eau potable",
   [WaterPointKind.WaterPoint]: "Point d'eau",
   [WaterPointKind.Tap]: "Robinet",
+  [WaterPointKind.Fountain]: "Fontaine",
   [WaterPointKind.Spring]: "Source",
   [WaterPointKind.Other]: "Eau (OSM)",
 };

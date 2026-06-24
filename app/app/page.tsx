@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Icon } from "@/components/varde/icon";
 import { TopBar } from "@/components/varde/top-bar";
-import type { AutonomyMode } from "@/components/varde/topo-map";
+import type { AutonomyMode, MapZoomControls } from "@/components/varde/topo-map";
 import { ElevationProfile } from "@/components/varde/elevation-profile";
 import { AutonomyPanels, type AutonomyTab } from "@/components/varde/autonomy-panels";
 import { PoiDetail } from "@/components/varde/poi-detail";
@@ -14,7 +14,9 @@ import { buildTerrain } from "@/lib/varde/terrain";
 import { DEFAULT_SLOPE_RANGE, type SlopeRange } from "@/lib/varde/terrain-slope";
 import { SlopeRangeControl } from "@/components/varde/slope-range-control";
 import { waterPointsToPois } from "@/lib/varde/water-proximity";
-import { useRouteWaterPoints } from "@/components/varde/use-route-water-points";
+import { useRouteWaterPoints, useWaterPoints } from "@/components/varde/use-water-points";
+import { type Bbox, WaterPointKind, WATER_FILTER_KINDS } from "@/lib/varde/water-points";
+import { PoiFilterPanel } from "@/components/varde/poi-filter-panel";
 
 // MapLibre touches `window` at module load — keep it out of the server bundle.
 const TopoMap = dynamic(
@@ -39,15 +41,74 @@ export default function Page() {
   const [controlsOpen, setControlsOpen] = useState(false);
 
   const [trace, setTrace] = useState<Trace | null>(null);
+  // Current map viewport bbox, updated by TopoMap on load and after each move.
+  const [viewportBbox, setViewportBbox] = useState<Bbox | null>(null);
+  // Imperative zoom handlers handed up by the map, driving the +/- buttons.
+  const [zoomControls, setZoomControls] = useState<MapZoomControls | null>(null);
+
+  // Advanced POI filter: which categories to fetch + which water sub-kinds to show.
+  const [poiFilterOpen, setPoiFilterOpen] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<ReadonlySet<string>>(
+    () => new Set(["water"]),
+  );
+  const [selectedKinds, setSelectedKinds] = useState<ReadonlySet<WaterPointKind>>(
+    () => new Set(WATER_FILTER_KINDS),
+  );
+  const toggleCategory = (key: string) =>
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const toggleKind = (kind: WaterPointKind) =>
+    setSelectedKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
 
   const route = useMemo(() => trace?.route ?? [], [trace]);
 
-  // Single water-point fetch for the whole route; projected onto the path and
-  // merged into the trace so the pure `buildSegments` picks the water points up.
-  const { waterPoints, isLoading: waterLoading, error: waterError } = useRouteWaterPoints(route);
+  // Two independent water-point fetches (both debounced, MongoDB-backed):
+  //  - viewport: drives the on-map overlay, refetched as the map moves, so points
+  //    show even when no GPX is loaded.
+  //  - route: a stable route-area fetch projected onto the path for the autonomy
+  //    plan, so the plan stays put when the map pans away from the route.
+  const {
+    waterPoints: viewportWaterPoints,
+    isLoading: viewportLoading,
+    error: viewportError,
+  } = useWaterPoints(viewportBbox, [...selectedCategories]);
+  const {
+    waterPoints: routeWaterPoints,
+    isLoading: routeLoading,
+    error: routeError,
+  } = useRouteWaterPoints(route);
+  // The map filter applies to the plan too: keep only the selected water
+  // sub-kinds, and drop water entirely if its category is unchecked. Mirrors the
+  // display filter below so map and plan stay in lockstep.
+  const filteredRouteWaterPoints = useMemo(
+    () =>
+      selectedCategories.has("water")
+        ? routeWaterPoints.filter((wp) => selectedKinds.has(wp.kind))
+        : [],
+    [routeWaterPoints, selectedCategories, selectedKinds],
+  );
   const derivedPois = useMemo(
-    () => waterPointsToPois(route, waterPoints),
-    [route, waterPoints],
+    () => waterPointsToPois(route, filteredRouteWaterPoints),
+    [route, filteredRouteWaterPoints],
+  );
+  // Feed the existing overlay/legend. routeError/routeLoading are inert when
+  // there's no route (the hook returns an empty result for a null bbox).
+  const waterError = viewportError ?? routeError;
+  const waterLoading = viewportLoading || routeLoading;
+  // Apply the sub-kind filter client-side: category selection already narrowed
+  // the fetch, this hides unchecked water kinds without a refetch.
+  const displayWaterPoints = useMemo(
+    () => viewportWaterPoints.filter((wp) => selectedKinds.has(wp.kind)),
+    [viewportWaterPoints, selectedKinds],
   );
   // Spread keeps `route` referentially stable, so the map's geometry/fitBounds
   // effect (keyed on `trace?.route`) won't re-fire when derived pois arrive.
@@ -132,7 +193,9 @@ export default function Page() {
               )}
               <TopoMap
                 trace={mergedTrace}
-                waterPoints={waterPoints}
+                waterPoints={displayWaterPoints}
+                onViewportChange={setViewportBbox}
+                onZoomControls={setZoomControls}
                 slopeOn={slopeOn}
                 terrainSlopeOn={terrainSlopeOn}
                 slopeRange={slopeRange}
@@ -159,57 +222,98 @@ export default function Page() {
                   type="button"
                   className={"mc-btn" + (controlsOpen ? " on" : "")}
                   onClick={() => setControlsOpen((open) => !open)}
-                  title="Options de la carte"
-                  aria-label="Options de la carte"
                   aria-expanded={controlsOpen}
                 >
-                  <Icon name="settings" size={18} />
+                  <span className="mc-ico">
+                    <Icon name="settings" size={18} />
+                  </span>
+                  <span className="mc-lab">Options de la carte</span>
                 </button>
                 {controlsOpen && (
                   <>
-                    <button type="button" className="mc-btn">
-                      +
+                    <button
+                      type="button"
+                      className="mc-btn"
+                      onClick={() => zoomControls?.zoomIn()}
+                    >
+                      <span className="mc-ico">+</span>
+                      <span className="mc-lab">Zoom avant</span>
                     </button>
-                    <button type="button" className="mc-btn">
-                      −
+                    <button
+                      type="button"
+                      className="mc-btn"
+                      onClick={() => zoomControls?.zoomOut()}
+                    >
+                      <span className="mc-ico">−</span>
+                      <span className="mc-lab">Zoom arrière</span>
                     </button>
                     <button
                       type="button"
                       className="mc-btn"
                       onClick={handleLocate}
                       disabled={locating}
-                      title="Ma position"
-                      aria-label="Centrer sur ma position"
                     >
-                      {locating ? (
-                        <span
-                          className="varde-spinner"
-                          role="status"
-                          aria-label="Localisation en cours"
-                        />
-                      ) : (
-                        <Icon name="locate" size={18} />
-                      )}
+                      <span className="mc-ico">
+                        {locating ? (
+                          <span
+                            className="varde-spinner"
+                            role="status"
+                            aria-label="Localisation en cours"
+                          />
+                        ) : (
+                          <Icon name="locate" size={18} />
+                        )}
+                      </span>
+                      <span className="mc-lab">Ma position</span>
                     </button>
-                    <button
-                      type="button"
-                      className={"mc-btn" + (slopeOn ? " on" : "")}
-                      onClick={() => setSlopeOn(!slopeOn)}
-                      title="Calque pente"
-                    >
-                      <Icon name="grad" size={18} />
-                    </button>
+                    {/* Route-line slope colouring — only meaningful with a trace. */}
+                    {hasTrace && (
+                      <button
+                        type="button"
+                        className={"mc-btn" + (slopeOn ? " on" : "")}
+                        onClick={() => setSlopeOn(!slopeOn)}
+                        aria-pressed={slopeOn}
+                      >
+                        <span className="mc-ico">
+                          <Icon name="grad" size={18} />
+                        </span>
+                        <span className="mc-lab">Calque pente</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={"mc-btn" + (terrainSlopeOn ? " on" : "")}
                       onClick={() => setTerrainSlopeOn(!terrainSlopeOn)}
-                      title="Carte des pentes"
+                      aria-pressed={terrainSlopeOn}
                     >
-                      <Icon name="mountain" size={18} />
+                      <span className="mc-ico">
+                        <Icon name="mountain" size={18} />
+                      </span>
+                      <span className="mc-lab">Carte des pentes</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={"mc-btn" + (poiFilterOpen ? " on" : "")}
+                      onClick={() => setPoiFilterOpen((open) => !open)}
+                      aria-expanded={poiFilterOpen}
+                    >
+                      <span className="mc-ico">
+                        <Icon name="layers" size={18} />
+                      </span>
+                      <span className="mc-lab">Points d&apos;intérêt</span>
                     </button>
                   </>
                 )}
               </div>
+              {poiFilterOpen && (
+                <PoiFilterPanel
+                  selectedCategories={selectedCategories}
+                  selectedKinds={selectedKinds}
+                  onToggleCategory={toggleCategory}
+                  onToggleKind={toggleKind}
+                  onClose={() => setPoiFilterOpen(false)}
+                />
+              )}
               <div className="map-legends">
                 {terrainSlopeOn && (
                   <div className="slope-legend terrain-slope-legend">

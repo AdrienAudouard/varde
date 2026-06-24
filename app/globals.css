@@ -454,18 +454,6 @@ button {
   font-family: "IBM Plex Mono", monospace;
   font-variant-numeric: tabular-nums;
 }
-.osm-water-popup-link {
-  display: inline-block;
-  margin-top: 10px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--accent);
-  text-decoration: none;
-}
-.osm-water-popup-link:hover {
-  text-decoration: underline;
-}
-
 .forest ellipse {
   fill: var(--forest);
 }
@@ -581,15 +569,32 @@ button {
   border: 1px solid var(--line);
 }
 .mc-btn {
-  width: 36px;
-  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 11px 0 7px;
   border-radius: 8px;
-  display: grid;
-  place-items: center;
-  font-size: 19px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-2);
   transition: 0.14s;
+  white-space: nowrap;
+  text-align: left;
+}
+/* Fixed leading slot so the SVG icons and the +/- glyphs align in a column. */
+.mc-ico {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.mc-lab {
+  flex: 1;
 }
 .mc-btn:hover {
   background: var(--card-2);
@@ -598,6 +603,117 @@ button {
 .mc-btn.on {
   background: var(--accent);
   color: #fff;
+}
+.mc-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Advanced POI filter panel — floats just left of the map controls (top-right).
+   Reuses the card-shell tokens so it matches the controls and legends. */
+.poi-filter {
+  position: absolute;
+  top: 14px;
+  right: 60px;
+  width: 212px;
+  max-width: calc(100% - 74px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+  z-index: 5;
+}
+.pf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.pf-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pf-close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  transition: 0.14s;
+}
+.pf-close:hover {
+  background: var(--card-2);
+  color: var(--ink);
+}
+.pf-cat + .pf-cat {
+  margin-top: 1px;
+}
+.pf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.pf-row input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.pf-row.disabled {
+  cursor: default;
+  color: var(--ink-3);
+}
+.pf-row.disabled input {
+  cursor: default;
+}
+.pf-lab {
+  flex: 1;
+}
+.pf-soon {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: var(--card-2);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+.pf-kinds {
+  margin-left: 13px;
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
+}
+.pf-kind {
+  font-weight: 500;
+  font-size: 12px;
+}
+/* Kind dots mirror the map's circle colors in topo-map-style.ts (kept in sync by
+   hand — MapLibre's paint spec can't read these CSS values, and vice-versa). */
+.pf-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.pf-dot-drinking_water {
+  background: #2b6f9e;
+}
+.pf-dot-spring {
+  background: #56b4e0;
+}
+.pf-dot-tap {
+  background: #2f9e8f;
+}
+.pf-dot-fountain {
+  background: #6f7fc4;
 }
 
 /* Bottom-left legend stack: the persistent route/POI legend sits in the corner,

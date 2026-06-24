@@ -15,12 +15,13 @@ import maplibregl, {
 import type { Feature, LineString, Point } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { pointAtKm, type Trace } from "@/lib/varde/data";
-import { type WaterPoint, type WaterPointKind } from "@/lib/varde/water-points";
+import { type Bbox, type WaterPoint, type WaterPointKind } from "@/lib/varde/water-points";
 import { buildSlopeFeatures, routeCoords } from "@/lib/varde/topo-features";
 import {
   DEFAULT_VIEW,
   EMPTY_FC,
   STYLE_URL,
+  WATER_MIN_ZOOM,
 } from "@/components/varde/topo-map-style";
 import { buildOsmPopupContent, makeMarkerElement } from "@/components/varde/topo-map-dom";
 import {
@@ -43,12 +44,24 @@ registerTerrainSlopeProtocol();
 
 export type AutonomyMode = "panel" | "badges" | "table";
 
+// Imperative zoom handlers handed to the page once the map exists, so the
+// custom labelled +/- controls can drive the map.
+export type MapZoomControls = { zoomIn: () => void; zoomOut: () => void };
+
 type TopoMapProps = {
   trace: Trace | null;
-  /** OSM water points for the route area, fetched once per trace by the page.
-   *  Rendered as the secondary `osm-water` layer; the page also projects them
-   *  into the trace's pois for the autonomy plan. */
+  /** OSM water points for the current map viewport, fetched by the page as the
+   *  map moves (see `onViewportChange`). Rendered as the `osm-water` layer. The
+   *  autonomy plan's water pois are projected separately from a route-area
+   *  fetch, so they stay anchored to the path when the viewport pans away. */
   waterPoints: readonly WaterPoint[];
+  /** Called with the map's viewport bbox on load and after each move, so the
+   *  page can fetch the water points to display. Emits `null` below
+   *  `WATER_MIN_ZOOM`, where the overlay doesn't render. */
+  onViewportChange?: (bbox: Bbox | null) => void;
+  /** Receives imperative zoom handlers once the map is created, so the page's
+   *  labelled +/- buttons can drive it. */
+  onZoomControls?: (controls: MapZoomControls) => void;
   slopeOn: boolean;
   /** Avalanche-style terrain slope overlay (the whole mountainside),
    *  independent of `slopeOn` (which colours only the route line). */
@@ -93,6 +106,8 @@ export function TopoMap({
   selectedPoi,
   setSelectedPoi,
   locateTarget,
+  onViewportChange,
+  onZoomControls,
 }: TopoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
@@ -108,6 +123,8 @@ export function TopoMap({
   const setHoverKmRef = useRef(setHoverKm);
   const setSelectedPoiRef = useRef(setSelectedPoi);
   const selectedPoiRef = useRef(selectedPoi);
+  const onViewportChangeRef = useRef(onViewportChange);
+  const onZoomControlsRef = useRef(onZoomControls);
   // Latest trace, read by the persistent map handlers (mousemove → nearest
   // route point) without re-mounting the map. Trace-dependent layers are only
   // added on `load` when a trace exists — a dormant seam until GPX import lands.
@@ -124,6 +141,12 @@ export function TopoMap({
   useEffect(() => {
     selectedPoiRef.current = selectedPoi;
   }, [selectedPoi]);
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
+  useEffect(() => {
+    onZoomControlsRef.current = onZoomControls;
+  }, [onZoomControls]);
 
   // Mount / unmount the map once. All later updates go through setData /
   // setLayoutProperty against the live map instance.
@@ -146,6 +169,12 @@ export function TopoMap({
       attributionControl: { compact: true },
     });
     mapRef.current = map;
+
+    // Hand the page imperative zoom controls for its labelled +/- buttons.
+    onZoomControlsRef.current?.({
+      zoomIn: () => map.zoomIn(),
+      zoomOut: () => map.zoomOut(),
+    });
 
     // Keep the canvas in sync with container-size changes — e.g. the top bar,
     // profile and autonomy panels appearing when a trace loads (the map goes
@@ -178,6 +207,21 @@ export function TopoMap({
       });
     };
 
+    // Report the viewport bbox to the page on load and after each settled move,
+    // so it can (re)fetch the water points to display. Below WATER_MIN_ZOOM the
+    // overlay doesn't render, so we emit null (clears it) and skip a wide query.
+    const emitViewport = () => {
+      const onChange = onViewportChangeRef.current;
+      if (!onChange) return;
+      if (map.getZoom() < WATER_MIN_ZOOM) {
+        onChange(null);
+        return;
+      }
+      const b = map.getBounds();
+      onChange([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+    };
+    map.on("moveend", emitViewport);
+
     map.on("load", () => {
       setupTerrain(map);
       addTraceLayers(map);
@@ -187,6 +231,8 @@ export function TopoMap({
       addWaterLayers(map);
       registerWaterInteractions();
       readyRef.current = true;
+      // Emit the initial viewport so points load without waiting for a move.
+      emitViewport();
     });
 
     const handleMove = (e: MapMouseEvent) => {
@@ -211,6 +257,10 @@ export function TopoMap({
     };
     map.on("mousemove", handleMove);
     map.on("mouseout", () => setHoverKmRef.current(null));
+
+    // Log the zoom level on every change. `zoom` fires continuously through a
+    // gesture/animation (use `zoomend` for one log per settle instead).
+    map.on("zoom", () => console.log("[varde/topo-map] zoom level", map.getZoom()));
 
     return () => {
       resizeObserver.disconnect();
