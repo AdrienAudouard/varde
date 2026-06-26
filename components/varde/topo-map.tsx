@@ -16,6 +16,7 @@ import type { Feature, LineString, Point } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { pointAtKm, type Trace } from "@/lib/varde/data";
 import { type Bbox, type WaterPoint, type WaterPointKind } from "@/lib/varde/water-points";
+import { type Refuge, type RefugeKind } from "@/lib/varde/refuges";
 import { buildSlopeFeatures, routeCoords } from "@/lib/varde/topo-features";
 import {
   DEFAULT_VIEW,
@@ -23,8 +24,13 @@ import {
   STYLE_URL,
   WATER_MIN_ZOOM,
 } from "@/components/varde/topo-map-style";
-import { buildOsmPopupContent, makeMarkerElement } from "@/components/varde/topo-map-dom";
 import {
+  buildOsmPopupContent,
+  buildRefugePopupContent,
+  makeMarkerElement,
+} from "@/components/varde/topo-map-dom";
+import {
+  addRefugeLayers,
   addTraceLayers,
   addWaterLayers,
   setupTerrain,
@@ -55,9 +61,13 @@ type TopoMapProps = {
    *  autonomy plan's water pois are projected separately from a route-area
    *  fetch, so they stay anchored to the path when the viewport pans away. */
   waterPoints: readonly WaterPoint[];
+  /** Refuges for the current map viewport, fetched by the page from refuges.info
+   *  as the map moves (see `onViewportChange`). Rendered as the `osm-refuge`
+   *  layer. Water-bearing ones are projected onto the plan separately. */
+  refuges: readonly Refuge[];
   /** Called with the map's viewport bbox on load and after each move, so the
-   *  page can fetch the water points to display. Emits `null` below
-   *  `WATER_MIN_ZOOM`, where the overlay doesn't render. */
+   *  page can fetch the water points / refuges to display. Emits `null` below
+   *  `WATER_MIN_ZOOM`, where the overlays don't render. */
   onViewportChange?: (bbox: Bbox | null) => void;
   /** Receives imperative zoom handlers once the map is created, so the page's
    *  labelled +/- buttons can drive it. */
@@ -97,6 +107,7 @@ function runWhenMapReady(
 export function TopoMap({
   trace,
   waterPoints,
+  refuges,
   slopeOn,
   terrainSlopeOn,
   slopeRange,
@@ -117,6 +128,9 @@ export function TopoMap({
   // popup can look up full details from the feature's `id` property without
   // round-tripping every field through GeoJSON properties.
   const waterPointsRef = useRef<Map<number, WaterPoint>>(new Map());
+  // Refuges fetched from the API — keyed by refuges.info id so the click popup
+  // can resolve full details from the feature's `id` property.
+  const refugesRef = useRef<Map<number, Refuge>>(new Map());
 
   // Latest-callback refs so the map's load/mousemove handlers (registered once)
   // always see the current props without re-creating the map on every render.
@@ -207,6 +221,30 @@ export function TopoMap({
       });
     };
 
+    // Refuge click/hover interactions, mirroring the water ones. Reads
+    // `refugesRef` to resolve a refuge's full details by id.
+    const registerRefugeInteractions = () => {
+      map.on("click", "osm-refuge-dot", (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const props = f.properties as { id?: number } | null;
+        const id = props?.id;
+        if (typeof id !== "number") return;
+        const r = refugesRef.current.get(id);
+        if (!r) return;
+        new maplibregl.Popup({ offset: 12, closeButton: true, maxWidth: "260px" })
+          .setLngLat([r.lng, r.lat])
+          .setDOMContent(buildRefugePopupContent(r))
+          .addTo(map);
+      });
+      map.on("mouseenter", "osm-refuge-dot", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", "osm-refuge-dot", () => {
+        map.getCanvas().style.cursor = "";
+      });
+    };
+
     // Report the viewport bbox to the page on load and after each settled move,
     // so it can (re)fetch the water points to display. Below WATER_MIN_ZOOM the
     // overlay doesn't render, so we emit null (clears it) and skip a wide query.
@@ -230,6 +268,8 @@ export function TopoMap({
       addTerrainSlopeLayer(map);
       addWaterLayers(map);
       registerWaterInteractions();
+      addRefugeLayers(map);
+      registerRefugeInteractions();
       readyRef.current = true;
       // Emit the initial viewport so points load without waiting for a move.
       emitViewport();
@@ -292,6 +332,25 @@ export function TopoMap({
       source.setData({ type: "FeatureCollection", features });
     });
   }, [waterPoints]);
+
+  // Render the refuge overlay from the prop and keep `refugesRef` in sync so the
+  // click popup can resolve full details by id. Mirrors the water effect above.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    runWhenMapReady(map, readyRef.current, () => {
+      const source = map.getSource("osm-refuge") as GeoJSONSource | undefined;
+      if (!source) return;
+      refugesRef.current = new Map(refuges.map((r) => [r.id, r]));
+      const features: Array<Feature<Point, { id: number; kind: RefugeKind }>> =
+        refuges.map((r) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [r.lng, r.lat] },
+          properties: { id: r.id, kind: r.kind },
+        }));
+      source.setData({ type: "FeatureCollection", features });
+    });
+  }, [refuges]);
 
   // Draw the route geometry (line, slope overlay, terminus dots) and frame it.
   // Keyed on `trace?.route` only — POI markers live in their own effect below so

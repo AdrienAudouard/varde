@@ -14,8 +14,11 @@ import { buildTerrain } from "@/lib/varde/terrain";
 import { DEFAULT_SLOPE_RANGE, type SlopeRange } from "@/lib/varde/terrain-slope";
 import { SlopeRangeControl } from "@/components/varde/slope-range-control";
 import { waterPointsToPois } from "@/lib/varde/water-proximity";
+import { refugesToPois } from "@/lib/varde/refuge-proximity";
 import { useRouteWaterPoints, useWaterPoints } from "@/components/varde/use-water-points";
-import { type Bbox, WaterPointKind, WATER_FILTER_KINDS } from "@/lib/varde/water-points";
+import { useRefuges, useRouteRefuges } from "@/components/varde/use-refuges";
+import { type Bbox, WATER_FILTER_KINDS } from "@/lib/varde/water-points";
+import { REFUGE_FILTER_KINDS } from "@/lib/varde/refuges";
 import { PoiFilterPanel } from "@/components/varde/poi-filter-panel";
 
 // MapLibre touches `window` at module load — keep it out of the server bundle.
@@ -49,10 +52,12 @@ export default function Page() {
   // Advanced POI filter: which categories to fetch + which water sub-kinds to show.
   const [poiFilterOpen, setPoiFilterOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<ReadonlySet<string>>(
-    () => new Set(["water"]),
+    () => new Set(["water", "refuge"]),
   );
-  const [selectedKinds, setSelectedKinds] = useState<ReadonlySet<WaterPointKind>>(
-    () => new Set(WATER_FILTER_KINDS),
+  // One set of sub-kind wire values across all POI types (water + refuge kinds
+  // are disjoint strings), so a single toggle path drives both filters.
+  const [selectedKinds, setSelectedKinds] = useState<ReadonlySet<string>>(
+    () => new Set<string>([...WATER_FILTER_KINDS, ...REFUGE_FILTER_KINDS]),
   );
   const toggleCategory = (key: string) =>
     setSelectedCategories((prev) => {
@@ -61,7 +66,7 @@ export default function Page() {
       else next.add(key);
       return next;
     });
-  const toggleKind = (kind: WaterPointKind) =>
+  const toggleKind = (kind: string) =>
     setSelectedKinds((prev) => {
       const next = new Set(prev);
       if (next.has(kind)) next.delete(kind);
@@ -86,6 +91,18 @@ export default function Page() {
     isLoading: routeLoading,
     error: routeError,
   } = useRouteWaterPoints(route);
+  // Refuges, fetched the same way from the refuges.info-backed route: a viewport
+  // overlay fetch + a route-area fetch projected onto the plan.
+  const {
+    refuges: viewportRefuges,
+    isLoading: refugeViewportLoading,
+    error: refugeViewportError,
+  } = useRefuges(viewportBbox, [...selectedCategories]);
+  const {
+    refuges: routeRefuges,
+    isLoading: refugeRouteLoading,
+    error: refugeRouteError,
+  } = useRouteRefuges(route);
   // The map filter applies to the plan too: keep only the selected water
   // sub-kinds, and drop water entirely if its category is unchecked. Mirrors the
   // display filter below so map and plan stay in lockstep.
@@ -100,21 +117,43 @@ export default function Page() {
     () => waterPointsToPois(route, filteredRouteWaterPoints),
     [route, filteredRouteWaterPoints],
   );
+  // Same category/kind filter for refuges; refugesToPois then keeps only the
+  // water-bearing ones as resupply stops (a dry shelter never resets the gauge).
+  const filteredRouteRefuges = useMemo(
+    () =>
+      selectedCategories.has("refuge")
+        ? routeRefuges.filter((r) => selectedKinds.has(r.kind))
+        : [],
+    [routeRefuges, selectedCategories, selectedKinds],
+  );
+  const derivedRefugePois = useMemo(
+    () => refugesToPois(route, filteredRouteRefuges),
+    [route, filteredRouteRefuges],
+  );
   // Feed the existing overlay/legend. routeError/routeLoading are inert when
   // there's no route (the hook returns an empty result for a null bbox).
   const waterError = viewportError ?? routeError;
   const waterLoading = viewportLoading || routeLoading;
+  const refugeError = refugeViewportError ?? refugeRouteError;
+  const refugeLoading = refugeViewportLoading || refugeRouteLoading;
   // Apply the sub-kind filter client-side: category selection already narrowed
-  // the fetch, this hides unchecked water kinds without a refetch.
+  // the fetch, this hides unchecked sub-kinds without a refetch.
   const displayWaterPoints = useMemo(
     () => viewportWaterPoints.filter((wp) => selectedKinds.has(wp.kind)),
     [viewportWaterPoints, selectedKinds],
   );
+  const displayRefuges = useMemo(
+    () => viewportRefuges.filter((r) => selectedKinds.has(r.kind)),
+    [viewportRefuges, selectedKinds],
+  );
   // Spread keeps `route` referentially stable, so the map's geometry/fitBounds
   // effect (keyed on `trace?.route`) won't re-fire when derived pois arrive.
   const mergedTrace = useMemo<Trace | null>(
-    () => (trace ? { ...trace, pois: [...trace.pois, ...derivedPois] } : null),
-    [trace, derivedPois],
+    () =>
+      trace
+        ? { ...trace, pois: [...trace.pois, ...derivedPois, ...derivedRefugePois] }
+        : null,
+    [trace, derivedPois, derivedRefugePois],
   );
 
   const pois = mergedTrace?.pois ?? [];
@@ -194,6 +233,7 @@ export default function Page() {
               <TopoMap
                 trace={mergedTrace}
                 waterPoints={displayWaterPoints}
+                refuges={displayRefuges}
                 onViewportChange={setViewportBbox}
                 onZoomControls={setZoomControls}
                 slopeOn={slopeOn}
@@ -207,9 +247,10 @@ export default function Page() {
                 selectedPoi={selectedPoi}
                 setSelectedPoi={setSelectedPoi}
               />
-              {waterError && (
+              {(waterError || refugeError) && (
                 <div className="varde-water-error" role="status">
-                  Points d&apos;eau : {waterError}
+                  {waterError && <div>Points d&apos;eau : {waterError}</div>}
+                  {refugeError && <div>Refuges : {refugeError}</div>}
                 </div>
               )}
               {locateError && (
@@ -352,6 +393,13 @@ export default function Page() {
                       </span>
                       <span>
                         <i className="lg refuge" /> Refuge
+                        {refugeLoading && (
+                          <span
+                            className="varde-spinner"
+                            role="status"
+                            aria-label="Chargement des refuges"
+                          />
+                        )}
                       </span>
                       <span>
                         <i className="lg dash" /> À vérifier

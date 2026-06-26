@@ -16,6 +16,7 @@ import {
   USER_LOC_COLOR,
   WATER_MIN_ZOOM,
   maptilerKeyFromStyleUrl,
+  osmRefugeColorExpr,
   osmWaterColorExpr,
 } from "@/components/varde/topo-map-style";
 
@@ -168,6 +169,36 @@ export function addWaterLayers(map: MaplibreMap): void {
     paint: {
       "circle-radius": 4.5,
       "circle-color": osmWaterColorExpr(),
+      "circle-stroke-color": "#fff",
+      "circle-stroke-width": 1.5,
+    },
+  });
+}
+
+// OSM refuge points layer (populated by the refuges fetch effect). Mirrors
+// addWaterLayers; added after it so refuges sit just above the water overlay.
+// Shares WATER_MIN_ZOOM so both overlays appear/query at the same zoom.
+export function addRefugeLayers(map: MaplibreMap): void {
+  map.addSource("osm-refuge", { type: "geojson", data: EMPTY_FC });
+  map.addLayer({
+    id: "osm-refuge-halo",
+    type: "circle",
+    source: "osm-refuge",
+    minzoom: WATER_MIN_ZOOM,
+    paint: {
+      "circle-radius": 9,
+      "circle-color": osmRefugeColorExpr(),
+      "circle-opacity": 0.22,
+    },
+  });
+  map.addLayer({
+    id: "osm-refuge-dot",
+    type: "circle",
+    source: "osm-refuge",
+    minzoom: WATER_MIN_ZOOM,
+    paint: {
+      "circle-radius": 4.5,
+      "circle-color": osmRefugeColorExpr(),
       "circle-stroke-color": "#fff",
       "circle-stroke-width": 1.5,
     },

@@ -5,6 +5,7 @@
 
 import { type Poi, type PoiType } from "@/lib/varde/data";
 import { KIND_LABEL, type WaterPoint } from "@/lib/varde/water-points";
+import { KIND_LABEL as REFUGE_KIND_LABEL, type Refuge } from "@/lib/varde/refuges";
 import { POI_COLOR } from "@/components/varde/topo-map-style";
 
 function poiGlyphSvg(type: PoiType): string {
@@ -56,6 +57,54 @@ export function buildOsmPopupContent(wp: WaterPoint): HTMLElement {
       list.appendChild(dd);
     }
     root.appendChild(list);
+  }
+
+  return root;
+}
+
+// Refuge popup — mirrors buildOsmPopupContent (textContent / safe href, no
+// innerHTML so untrusted API values can't smuggle markup) and reuses the
+// .osm-water-popup* styles. Adds a link out to the refuges.info detail page.
+export function buildRefugePopupContent(r: Refuge): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "osm-water-popup";
+
+  const title = document.createElement("div");
+  title.className = "osm-water-popup-title";
+  title.textContent = r.name ?? REFUGE_KIND_LABEL[r.kind];
+  root.appendChild(title);
+
+  const sub = document.createElement("div");
+  sub.className = "osm-water-popup-sub";
+  sub.textContent = REFUGE_KIND_LABEL[r.kind];
+  root.appendChild(sub);
+
+  const rows: Array<readonly [string, string]> = [];
+  if (typeof r.alt === "number") rows.push(["Altitude", `${r.alt} m`]);
+  if (typeof r.beds === "number") rows.push(["Places", String(r.beds)]);
+  rows.push(["Eau", r.hasWater ? "oui" : "non"]);
+  if (r.status) rows.push(["État", r.status]);
+
+  const list = document.createElement("dl");
+  list.className = "osm-water-popup-list";
+  for (const [k, v] of rows) {
+    const dt = document.createElement("dt");
+    dt.textContent = k;
+    const dd = document.createElement("dd");
+    dd.textContent = v;
+    list.appendChild(dt);
+    list.appendChild(dd);
+  }
+  root.appendChild(list);
+
+  if (r.link) {
+    const a = document.createElement("a");
+    a.className = "osm-water-popup-link";
+    a.href = r.link;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "Voir sur refuges.info";
+    root.appendChild(a);
   }
 
   return root;

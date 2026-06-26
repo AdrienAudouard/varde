@@ -8,6 +8,7 @@ import type { ExpressionSpecification } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import type { PoiType } from "@/lib/varde/data";
 import { WaterPointKind } from "@/lib/varde/water-points";
+import { RefugeKind } from "@/lib/varde/refuges";
 
 // Initial camera when no trace is loaded: centred on the French Alps
 // (Tarentaise). Zoom 10 keeps the resting zoom comfortably above WATER_MIN_ZOOM
@@ -90,4 +91,26 @@ export const osmWaterColorExpr = (): ExpressionSpecification => [
   WaterPointKind.Fountain,
   FOUNTAIN_DOT_COLOR,
   WATER_DOT_COLOR,
+];
+
+// OSM refuge dot colors — a purple family matching the curated refuge POI color
+// (--poi-refuge), kept distinct from the water layer's blues/teals. Each
+// sub-kind gets its own shade so the overlay dots and the filter dots agree
+// (the filter swatches in globals.css mirror these by hand).
+export const REFUGE_GUARDED_COLOR = "#7a4ec0"; // refuge gardé — deep purple
+export const REFUGE_UNGUARDED_COLOR = "#a884cc"; // cabane non gardée — light lavender
+export const REFUGE_GITE_COLOR = "#c06fb0"; // gîte d'étape — purple-pink
+
+// Shared `circle-color` expression for the refuge halo + dot layers. Match cases
+// come from the RefugeKind enum; unmatched kinds fall back to the guarded purple.
+export const osmRefugeColorExpr = (): ExpressionSpecification => [
+  "match",
+  ["get", "kind"],
+  RefugeKind.Guarded,
+  REFUGE_GUARDED_COLOR,
+  RefugeKind.Unguarded,
+  REFUGE_UNGUARDED_COLOR,
+  RefugeKind.Gite,
+  REFUGE_GITE_COLOR,
+  REFUGE_GUARDED_COLOR,
 ];

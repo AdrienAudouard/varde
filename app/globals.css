@@ -454,6 +454,17 @@ button {
   font-family: "IBM Plex Mono", monospace;
   font-variant-numeric: tabular-nums;
 }
+/* Outbound link in the refuge popup (reuses the .osm-water-popup shell). */
+.osm-water-popup-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.osm-water-popup-link:hover {
+  text-decoration: underline;
+}
 .forest ellipse {
   fill: var(--forest);
 }
@@ -714,6 +725,17 @@ button {
 }
 .pf-dot-fountain {
   background: #6f7fc4;
+}
+/* Refuge sub-kind dots — mirror the map's osm-refuge circle colors in
+   topo-map-style.ts (REFUGE_*_COLOR), kept in sync by hand. */
+.pf-dot-refuge_garde {
+  background: #7a4ec0;
+}
+.pf-dot-cabane_non_gardee {
+  background: #a884cc;
+}
+.pf-dot-gite_etape {
+  background: #c06fb0;
 }
 
 /* Bottom-left legend stack: the persistent route/POI legend sits in the corner,
